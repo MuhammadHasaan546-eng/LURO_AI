@@ -20,18 +20,9 @@ export const generateMetadata = ({
   title = `${process.env.NEXT_PUBLIC_APP_NAME} - Smart Social Media Marketing Platform`,
   description = "Streamline your social media management with AI-powered analytics, scheduling, and content generation.",
   image = "/thumbnail.png",
-  icons = [
-    {
-      rel: "icon",
-      url: "/icons/favicon-16x16.png",
-      sizes: "16x16",
-    },
-    {
-      rel: "icon",
-      url: "/icons/favicon-32x32.png",
-      sizes: "32x32",
-    },
-  ],
+  icons = {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+  },
   noIndex = false,
   keywords = [
     "AI content creation",

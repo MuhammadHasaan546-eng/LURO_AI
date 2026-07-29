@@ -1,4 +1,4 @@
-import { LucideProps, PenOff } from "lucide-react";
+import { LucideProps } from "lucide-react";
 
 type IconType = {
   [key: string]: (props: LucideProps) => React.JSX.Element;
@@ -14,12 +14,7 @@ const Icons: IconType = {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        fill="currentColor"
-        d="M73.9216 7.17157V38.204H122.078V7.17157H73.9216Z"
-      />
+      <image href="/icons/icon.png" width="196" height="196" />
     </svg>
   ),
 

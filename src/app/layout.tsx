@@ -2,6 +2,8 @@
 // import { Toaster } from "@/components/ui/sonner";
 // import { Providers } from "@/components";
 
+import "./style/global.css";
+
 import { cn } from "@/functions/cs";
 import { generateMetadata } from "@/functions/metadata";
 import { inter, satoshi } from "./constant/font";

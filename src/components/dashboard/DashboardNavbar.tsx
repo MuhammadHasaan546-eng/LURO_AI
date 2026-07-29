@@ -10,7 +10,7 @@ const DashboardNavbar = () => {
   return (
     <header
       id="dashboard-navbar"
-      className="fixed top-0 inset-x-0 w-full h-16 bg-background/40 backdrop-blur-md  border-border/50 px-4 z-50"
+      className="fixed top-0 inset-x-0 w-full h-16 bg-background/40 backdrop-blur-md border-b border-border/500 px-4 z-50"
     >
       <Container className="flex  items-center justify-between size-full ">
         <div className="flex item-center">
@@ -38,7 +38,7 @@ const DashboardNavbar = () => {
               <HelpCircleIcon className="size-5" />
             </Link>
           </Button>
-          {"mobile side bar"}
+          {/* {"mobile side bar"} */}
         </div>
       </Container>
     </header>
