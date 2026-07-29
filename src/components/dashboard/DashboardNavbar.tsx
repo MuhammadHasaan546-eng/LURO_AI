@@ -1,9 +1,10 @@
-import { Container, HelpCircleIcon, ZapIcon } from "lucide-react";
+import { HelpCircleIcon, ZapIcon } from "lucide-react";
 import { Span } from "next/dist/trace";
 import Link from "next/link";
 import React from "react";
 import Icons from "../global/icons";
 import { Button } from "../ui/button";
+import Container from "../global/container";
 
 const DashboardNavbar = () => {
   return (

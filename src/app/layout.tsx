@@ -1,12 +1,12 @@
-import "@/styles/globals.css";
-import { cn } from "./functions/cs";
-import { generateMetadata } from "./functions/metadata";
-import { inter, satoshi } from "./app/constants/font";
-import { Toaster } from "sonner";
-import Providers from "./components/global/providers";
 // import { inter, satoshi } from "@/constants";
 // import { Toaster } from "@/components/ui/sonner";
 // import { Providers } from "@/components";
+
+import { cn } from "@/functions/cs";
+import { generateMetadata } from "@/functions/metadata";
+import { inter, satoshi } from "./constant/font";
+import { Toaster } from "sonner";
+import Providers from "@/components/global/providers";
 
 export const metadata = generateMetadata();
 

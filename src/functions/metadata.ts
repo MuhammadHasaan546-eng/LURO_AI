@@ -108,6 +108,7 @@ export const generateMetadata = ({
       creator: twitterHandle,
       ...(imageUrl && { images: [imageUrl] }),
     },
+
     verification: {
       google: process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION || "",
       yandex: process.env.NEXT_PUBLIC_YANDEX_VERIFICATION || "",
