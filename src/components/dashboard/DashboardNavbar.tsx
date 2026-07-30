@@ -5,6 +5,7 @@ import React from "react";
 import Icons from "../global/icons";
 import { Button } from "../ui/button";
 import Container from "../global/container";
+import { DashboardSidebar } from "./DashboardSidebar";
 
 const DashboardNavbar = () => {
   return (
