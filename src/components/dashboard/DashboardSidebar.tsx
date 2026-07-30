@@ -17,6 +17,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { SIDEBAR_LINKS } from "@/app/constant/links";
@@ -25,9 +26,31 @@ import Container from "../global/container";
 export const DashboardSidebar = () => {
   const pathname = usePathname();
   const { signOut } = useClerk();
+  const { isMobile, setOpen, setOpenMobile } = useSidebar();
+
+  const expandDesktopSidebar = () => {
+    if (!isMobile) setOpen(true);
+  };
+
+  const collapseDesktopSidebar = () => {
+    if (!isMobile) setOpen(false);
+  };
+
+  const handleBlur = (event: React.FocusEvent<HTMLElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      collapseDesktopSidebar();
+    }
+  };
 
   return (
-    <Sidebar collapsible="icon" className="top-16 border-r border-border/50">
+    <Sidebar
+      collapsible="icon"
+      className="top-16 border-r border-border/50"
+      onPointerEnter={expandDesktopSidebar}
+      onPointerLeave={collapseDesktopSidebar}
+      onFocusCapture={expandDesktopSidebar}
+      onBlurCapture={handleBlur}
+    >
       <SidebarHeader className="p-3">
         <Container delay={0.2} className="h-max w-full">
           <Button
@@ -66,6 +89,7 @@ export const DashboardSidebar = () => {
                         <Link
                           href={link.href}
                           className="flex items-center gap-x-3"
+                          onClick={() => setOpenMobile(false)}
                         >
                           {Icon && <Icon className="size-4" />}
                           <span>{link.label}</span>
@@ -93,23 +117,8 @@ export const DashboardSidebar = () => {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
-      <SidebarFooter className="mt-auto p-2 border-t border-border/50">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              tooltip="Logout"
-              onClick={() => signOut({ redirectUrl: "/" })}
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-            >
-              <LogOut className="size-4 shrink-0" />
-              <span>Logout</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
 
-      {/* Hover par resize ya collapse ke liye rail */}
-      <SidebarRail />
+      <SidebarRail aria-label="Toggle dashboard sidebar" />
     </Sidebar>
   );
 };

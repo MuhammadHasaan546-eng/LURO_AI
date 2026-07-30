@@ -1,13 +1,16 @@
+"use client";
+
 import { HelpCircleIcon, ZapIcon } from "lucide-react";
-import { Span } from "next/dist/trace";
 import Link from "next/link";
 import React from "react";
 import Icons from "../global/icons";
 import { Button } from "../ui/button";
 import Container from "../global/container";
-import { DashboardSidebar } from "./DashboardSidebar";
+import { SidebarTrigger, useSidebar } from "../ui/sidebar";
 
 const DashboardNavbar = () => {
+  const { openMobile } = useSidebar();
+
   return (
     <header
       id="dashboard-navbar"
@@ -39,7 +42,15 @@ const DashboardNavbar = () => {
               <HelpCircleIcon className="size-5" />
             </Link>
           </Button>
-          {/* {"mobile side bar"} */}
+          <SidebarTrigger
+            className="md:hidden"
+            aria-label={
+              openMobile
+                ? "Close dashboard navigation"
+                : "Open dashboard navigation"
+            }
+            aria-expanded={openMobile}
+          />
         </div>
       </Container>
     </header>
