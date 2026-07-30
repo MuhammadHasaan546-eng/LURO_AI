@@ -60,7 +60,7 @@ export function Navbar() {
               <ul className="grid gap-3 p-4 md:w-[400px] lg:w-[500px] lg:grid-cols-[.75fr_1fr] bg-zinc-950 border border-zinc-800 text-white rounded-xl">
                 <li className="row-span-3">
                   <NavigationMenuLink asChild>
-                    <a
+                    <Link
                       className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-blue-600/20 to-zinc-900 p-6 no-underline outline-none focus:shadow-md border border-white/10"
                       href="/"
                     >
@@ -71,7 +71,7 @@ export function Navbar() {
                         All-in-one AI platform to manage social media campaigns
                         effortlessly.
                       </p>
-                    </a>
+                    </Link>
                   </NavigationMenuLink>
                 </li>
                 <ListItem href="/docs" title="Introduction">
