@@ -1,32 +1,10 @@
 "use client";
 
 import { cn } from "@/functions/cs";
-import {
-  BadgeDollarSign,
-  ChevronDown,
-  CircleHelp,
-  Compass,
-  Menu,
-  Sparkles,
-  SunMedium,
-  X,
-  type LucideIcon,
-} from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState } from "react";
-
-type NavItem = {
-  label: string;
-  href: string;
-  icon: LucideIcon;
-  hasMenu?: boolean;
-};
-
-const navItems: NavItem[] = [
-  { label: "How it works", href: "#how-it-works", icon: Compass },
-  { label: "Features", href: "#features", icon: Sparkles, hasMenu: true },
-  { label: "Pricing", href: "#pricing", icon: BadgeDollarSign },
-  { label: "About", href: "#about", icon: CircleHelp },
-];
+import { Menu } from "./menu";
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -70,70 +48,65 @@ export const Navbar = () => {
   };
 
   return (
-    <header className="pointer-events-none fixed inset-x-0 top-0 z-[100] px-3 pt-3 sm:px-5 sm:pt-4">
+    <header className="pointer-events-none sticky inset-x-0 top-3 z-[100] flex justify-center px-3 pt-3 sm:px-5 sm:pt-4">
       <nav
         aria-label="Primary navigation"
-        className={cn(
-          "pointer-events-auto mx-auto w-full max-w-6xl overflow-hidden border border-white/[0.12] bg-[#292929]/90 text-[#d7d7d7] shadow-[0_14px_40px_rgba(0,0,0,0.22)] backdrop-blur-xl",
-          "rounded-[18px] transition-[border-radius,background-color] duration-300",
-          isOpen && "bg-[#242424]/95",
-        )}
+        className="pointer-events-auto relative mx-auto w-full max-w-6xl rounded-[20px] border border-black/10 bg-white/75 text-black shadow-[0_12px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl"
       >
-        <div className="flex h-14 items-center px-3 sm:h-[60px] sm:px-4">
-          <a
-            href="#top"
+        <div className="flex h-14 items-center justify-between gap-2 px-3 sm:h-[60px] sm:px-4 md:gap-4 md:px-5">
+          {/* Logo */}
+          <Link
+            href="/"
             aria-label="Luro AI home"
             onClick={() => selectItem("#top")}
-            className="mr-2 grid size-9 shrink-0 place-items-center rounded-full text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 sm:mr-4"
+            className="grid size-9 shrink-0 place-items-center rounded-full transition-opacity hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/50 focus-visible:ring-offset-2"
           >
-            <SunMedium
-              aria-hidden="true"
-              className="size-[19px]"
-              strokeWidth={1.7}
+            <Image
+              src="/icons/icon.png"
+              alt=""
+              width={36}
+              height={36}
+              className="size-8 object-contain"
+              priority
             />
-          </a>
+          </Link>
 
-          <div className="hidden min-w-0 flex-1 items-center gap-1 md:flex">
-            {navItems.map(({ label, href, icon: Icon, hasMenu }) => {
-              const isActive = activeHash === href;
-
-              return (
-                <a
-                  key={href}
-                  href={href}
-                  aria-current={isActive ? "page" : undefined}
-                  onClick={() => selectItem(href)}
-                  className={cn(
-                    "group relative flex h-10 items-center gap-2 rounded-lg px-3 text-[13px] font-medium transition-colors lg:px-4 lg:text-sm",
-                    "hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
-                    isActive && "bg-white/[0.08] text-white",
-                  )}
-                >
-                  <Icon
-                    aria-hidden="true"
-                    className="size-4 shrink-0 opacity-75 transition-opacity group-hover:opacity-100"
-                    strokeWidth={1.8}
-                  />
-                  <span className="whitespace-nowrap">{label}</span>
-                  {hasMenu && (
-                    <ChevronDown
-                      aria-hidden="true"
-                      className="size-3.5 shrink-0 opacity-70 transition-transform group-hover:translate-y-0.5"
-                      strokeWidth={1.8}
-                    />
-                  )}
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "absolute inset-x-3 bottom-0 h-px origin-center scale-x-0 bg-white/80 transition-transform",
-                      isActive && "scale-x-100",
-                    )}
-                  />
-                </a>
-              );
-            })}
+          {/* Desktop Menu */}
+          <div className="hidden min-w-0 flex-1 items-center justify-center md:flex">
+            <Menu activeHash={activeHash} onSelect={selectItem} />
           </div>
 
+          {/* Desktop Actions */}
+          <div className="hidden shrink-0 items-center gap-2.5 md:flex">
+            <Link
+              href="/login"
+              className="whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium text-black/80 transition-colors hover:bg-black/5 hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/50"
+            >
+              Log in
+            </Link>
+            <Link
+              href="/signup"
+              className="group inline-flex whitespace-nowrap items-center gap-1.5 rounded-full px-5 py-2 text-sm font-medium text-white shadow-sm transition-all hover:shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
+            >
+              <span>Start for free</span>
+              <svg
+                aria-hidden="true"
+                className="size-4 transition-transform group-hover:translate-x-0.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth="2"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
+                />
+              </svg>
+            </Link>
+          </div>
+
+          {/* Mobile Menu Toggle Button */}
           <button
             type="button"
             aria-label={
@@ -142,16 +115,18 @@ export const Navbar = () => {
             aria-controls="mobile-navigation"
             aria-expanded={isOpen}
             onClick={() => setIsOpen((open) => !open)}
-            className="ml-auto grid size-10 place-items-center rounded-lg text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 md:hidden"
+            className="grid h-10 min-w-14 shrink-0 place-items-center rounded-full px-3 text-black transition-colors hover:bg-black/[0.07] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/50 focus-visible:ring-offset-2 md:hidden"
           >
-            {isOpen ? (
-              <X aria-hidden="true" className="size-5" />
-            ) : (
-              <Menu aria-hidden="true" className="size-5" />
-            )}
+            <span
+              aria-hidden="true"
+              className="text-xs font-semibold uppercase tracking-wider"
+            >
+              {isOpen ? "Close" : "Menu"}
+            </span>
           </button>
         </div>
 
+        {/* Mobile menu container */}
         <div
           id="mobile-navigation"
           className={cn(
@@ -159,41 +134,41 @@ export const Navbar = () => {
             isOpen ? "visible grid-rows-[1fr]" : "invisible grid-rows-[0fr]",
           )}
         >
-          <div className="min-h-0 overflow-hidden">
-            <div className="flex flex-col gap-1 border-t border-white/10 p-2.5">
-              {navItems.map(({ label, href, icon: Icon, hasMenu }) => {
-                const isActive = activeHash === href;
+          <div className="min-h-0 overflow-hidden rounded-b-[20px]">
+            <div className="flex flex-col gap-4 border-t border-black/10 px-4 py-4 sm:px-5">
+              <Menu activeHash={activeHash} onSelect={selectItem} mobile />
 
-                return (
-                  <a
-                    key={href}
-                    href={href}
-                    aria-current={isActive ? "page" : undefined}
-                    onClick={() => selectItem(href)}
-                    className={cn(
-                      "flex min-h-12 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
-                      "hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70",
-                      isActive
-                        ? "bg-white/[0.09] text-white"
-                        : "text-[#c5c5c5]",
-                    )}
+              {/* Mobile Actions */}
+              <div className="flex flex-col gap-2.5 pt-3 border-t border-black/10">
+                <Link
+                  href="/login"
+                  onClick={() => setIsOpen(false)}
+                  className="flex h-11 items-center justify-center rounded-full border border-black/10 text-sm font-medium text-black transition-colors hover:bg-black/5"
+                >
+                  Log in
+                </Link>
+                <Link
+                  href="/signup"
+                  onClick={() => setIsOpen(false)}
+                  className="group flex h-11 items-center justify-center gap-1.5 rounded-full  text-sm font-medium text-white transition-opacity hover:opacity-90"
+                >
+                  <span>Start for free</span>
+                  <svg
+                    aria-hidden="true"
+                    className="size-4 transition-transform group-hover:translate-x-0.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth="2"
+                    stroke="currentColor"
                   >
-                    <Icon
-                      aria-hidden="true"
-                      className="size-[18px] shrink-0"
-                      strokeWidth={1.8}
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"
                     />
-                    <span>{label}</span>
-                    {hasMenu && (
-                      <ChevronDown
-                        aria-hidden="true"
-                        className="ml-auto size-4 opacity-70"
-                        strokeWidth={1.8}
-                      />
-                    )}
-                  </a>
-                );
-              })}
+                  </svg>
+                </Link>
+              </div>
             </div>
           </div>
         </div>
