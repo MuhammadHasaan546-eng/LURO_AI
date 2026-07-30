@@ -26,7 +26,7 @@ export const Navbar = () => {
       {/* Main Floating Header */}
       <header
         className={cn(
-          "fixed inset-x-0 top-3 mx-auto max-w-6xl px-4 md:px-12 z-[100] transition-all duration-300 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-md flex flex-col justify-between overflow-hidden",
+          "fixed inset-x-0 top-3 mx-auto px-4 md:px-12 z-[100] transition-all duration-300 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-md flex flex-col justify-between overflow-hidden",
           isOpen ? "h-[calc(100vh-24px)]" : "h-12",
         )}
       >
