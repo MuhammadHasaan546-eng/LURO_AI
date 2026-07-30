@@ -2,13 +2,15 @@
 // import { Toaster } from "@/components/ui/sonner";
 // import { Providers } from "@/components";
 
-import "./style/global.css";
+import "../style/global.css";
 
 import { cn } from "@/functions/cs";
 import { generateMetadata } from "@/functions/metadata";
-import { inter, satoshi } from "./constant/font";
 import { Toaster } from "sonner";
 import Providers from "@/components/global/providers";
+import { inter, satoshi } from "../constant/font";
+import "../globals.css";
+import { Navbar } from "@/components/marketing/Navbar";
 
 export const metadata = generateMetadata();
 
@@ -27,6 +29,7 @@ export default function RootLayout({
         )}
       >
         <Toaster richColors theme="dark" position="top-right" />
+        <Navbar />
         <Providers>{children}</Providers>
       </body>
     </html>
