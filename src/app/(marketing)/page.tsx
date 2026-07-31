@@ -1,10 +1,10 @@
 import Background from "@/components/global/background";
 import Connect from "@/components/marketing/Connect";
+import Features from "@/components/marketing/Features";
 import Hero from "@/components/marketing/hero";
 import { TrustedCompanies } from "@/components/marketing/TrustedCompanies";
-import Spotlight from "@/components/ui/spotlight";
+import Spotlight from "@/components/ui/spotlightBackground";
 import Image from "next/image";
-// Baaki components import karein (Background, Spotlight, Hero etc.)
 
 const MarketingPage = () => {
   return (
@@ -52,6 +52,7 @@ const MarketingPage = () => {
 
       <TrustedCompanies />
       <Connect />
+      <Features />
     </main>
   );
 };

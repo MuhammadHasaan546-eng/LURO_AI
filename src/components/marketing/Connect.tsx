@@ -30,82 +30,96 @@ export default function Connect({ className }: ConnectProps) {
 
   return (
     <LiquidBackground>
-      <section className="relative w-full py-20 overflow-hidden border-b border-white/10">
+      <section className="relative w-full py-20 overflow-hidden border-b border-white/10 flex flex-col items-center justify-center">
+        {/* Section Header */}
+        <div className="text-center mb-10 z-10 px-4">
+          <p className="text-xs sm:text-sm font-semibold tracking-wider text-violet-400 uppercase">
+            Connect
+          </p>
+          <h3 className="text-2xl sm:text-3xl font-bold text-white mt-2">
+            Integrated AI Creative Engine
+          </h3>
+        </div>
+
+        {/* --- MAIN CONNECT CONTAINER --- */}
         <div
           ref={containerRef}
           className={cn(
-            "relative flex w-full max-w-[650px] mx-auto items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-slate-950/80 p-6 sm:p-10 backdrop-blur-md shadow-2xl shadow-violet-950/30",
+            "relative flex w-full max-w-[650px] mx-auto items-center justify-center overflow-hidden rounded-3xl border border-violet-500/20 bg-slate-950/60 p-6 sm:p-12 backdrop-blur-xl shadow-2xl shadow-violet-950/50",
             className,
           )}
         >
-          <div className="flex h-full w-full flex-col items-stretch justify-between gap-12">
+          {/* Subtle Background Radial/Dotted Glow effect like the image */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.15)_0,transparent_70%)] pointer-events-none" />
+
+          <div className="flex h-full w-full flex-col items-stretch justify-between gap-10 sm:gap-14 relative z-10">
             {/* Top Row */}
-            <div className="flex flex-row items-center justify-between z-10">
-              {/* Top Left: Image Icon */}
+            <div className="flex flex-row items-center justify-between">
+              {/* Image Icon */}
               <Circle
                 ref={div1Ref}
-                className="bg-violet-950/70 border-violet-500/30 text-violet-300 p-3 sm:p-3.5 shadow-lg shadow-violet-500/20"
+                className="bg-violet-900/40 border-violet-500/40 text-violet-200 p-3 sm:p-4 shadow-lg shadow-violet-500/20 backdrop-blur-md hover:scale-110 transition-transform"
               >
                 <Image className="w-5 h-5 sm:w-6 sm:h-6" />
               </Circle>
 
-              {/* Top Right: Book Icon */}
+              {/* Book Icon */}
               <Circle
                 ref={div5Ref}
-                className="bg-violet-950/70 border-violet-500/30 text-violet-300 p-3 sm:p-3.5 shadow-lg shadow-violet-500/20"
+                className="bg-violet-900/40 border-violet-500/40 text-violet-200 p-3 sm:p-4 shadow-lg shadow-violet-500/20 backdrop-blur-md hover:scale-110 transition-transform"
               >
                 <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" />
               </Circle>
             </div>
 
             {/* Middle Row */}
-            <div className="flex flex-row items-center justify-between z-10">
-              {/* Mid Left: Zap Icon */}
+            <div className="flex flex-row items-center justify-between">
+              {/* Zap Icon */}
               <Circle
                 ref={div2Ref}
-                className="bg-violet-950/70 border-violet-500/30 text-violet-300 p-3 sm:p-3.5 shadow-lg shadow-violet-500/20"
+                className="bg-violet-900/40 border-violet-500/40 text-violet-200 p-3 sm:p-4 shadow-lg shadow-violet-500/20 backdrop-blur-md hover:scale-110 transition-transform"
               >
                 <Zap className="w-5 h-5 sm:w-6 sm:h-6" />
               </Circle>
 
-              {/* Center Hub: AI Sunburst / Sparkles Logo */}
+              {/* Center Hub: Custom Purple Glow Hub */}
               <Circle
                 ref={div4Ref}
-                className="h-16 w-16 sm:h-20 sm:w-20 p-4 bg-gradient-to-tr from-violet-700 via-violet-600 to-indigo-500 border-2 border-violet-300/50 text-white shadow-2xl shadow-violet-600/60"
+                className="h-16 w-16 sm:h-20 sm:w-20 p-4 bg-gradient-to-tr from-violet-600 via-indigo-600 to-purple-500 border-2 border-violet-300 text-white shadow-[0_0_30px_rgba(139,92,246,0.6)] hover:scale-105 transition-transform"
               >
                 <Sparkles className="w-full h-full animate-pulse" />
               </Circle>
 
-              {/* Mid Right: Music Icon */}
+              {/* Music Icon */}
               <Circle
                 ref={div6Ref}
-                className="bg-violet-950/70 border-violet-500/30 text-violet-300 p-3 sm:p-3.5 shadow-lg shadow-violet-500/20"
+                className="bg-violet-900/40 border-violet-500/40 text-violet-200 p-3 sm:p-4 shadow-lg shadow-violet-500/20 backdrop-blur-md hover:scale-110 transition-transform"
               >
                 <Music className="w-5 h-5 sm:w-6 sm:h-6" />
               </Circle>
             </div>
 
             {/* Bottom Row */}
-            <div className="flex flex-row items-center justify-between z-10">
-              {/* Bottom Left: Aperture / Orbit Icon */}
+            <div className="flex flex-row items-center justify-between">
+              {/* Aperture Icon */}
               <Circle
                 ref={div3Ref}
-                className="bg-violet-950/70 border-violet-500/30 text-violet-300 p-3 sm:p-3.5 shadow-lg shadow-violet-500/20"
+                className="bg-violet-900/40 border-violet-500/40 text-violet-200 p-3 sm:p-4 shadow-lg shadow-violet-500/20 backdrop-blur-md hover:scale-110 transition-transform"
               >
                 <Aperture className="w-5 h-5 sm:w-6 sm:h-6" />
               </Circle>
 
-              {/* Bottom Right: Magic Wand Icon */}
+              {/* Wand Icon */}
               <Circle
                 ref={div7Ref}
-                className="bg-violet-950/70 border-violet-500/30 text-violet-300 p-3 sm:p-3.5 shadow-lg shadow-violet-500/20"
+                className="bg-violet-900/40 border-violet-500/40 text-violet-200 p-3 sm:p-4 shadow-lg shadow-violet-500/20 backdrop-blur-md hover:scale-110 transition-transform"
               >
                 <Wand2 className="w-5 h-5 sm:w-6 sm:h-6" />
               </Circle>
             </div>
           </div>
 
-          {/* Purple Glow Beams matching screenshot theme */}
+          {/* Glowing Connecting Lines (Beams) */}
           <AnimatedBeam
             containerRef={containerRef}
             fromRef={div1Ref}
@@ -113,16 +127,16 @@ export default function Connect({ className }: ConnectProps) {
             curvature={-75}
             endYOffset={-10}
             dotted
-            gradientStartColor="#8b5cf6"
-            gradientStopColor="#c084fc"
+            gradientStartColor="#a855f7"
+            gradientStopColor="#8b5cf6"
           />
           <AnimatedBeam
             containerRef={containerRef}
             fromRef={div2Ref}
             toRef={div4Ref}
             dotted
-            gradientStartColor="#8b5cf6"
-            gradientStopColor="#c084fc"
+            gradientStartColor="#a855f7"
+            gradientStopColor="#8b5cf6"
           />
           <AnimatedBeam
             containerRef={containerRef}
@@ -131,8 +145,8 @@ export default function Connect({ className }: ConnectProps) {
             curvature={75}
             endYOffset={10}
             dotted
-            gradientStartColor="#8b5cf6"
-            gradientStopColor="#c084fc"
+            gradientStartColor="#a855f7"
+            gradientStopColor="#8b5cf6"
           />
           <AnimatedBeam
             containerRef={containerRef}
@@ -142,7 +156,7 @@ export default function Connect({ className }: ConnectProps) {
             endYOffset={-10}
             reverse
             gradientStartColor="#a855f7"
-            gradientStopColor="#c084fc"
+            gradientStopColor="#8b5cf6"
             dotted
           />
           <AnimatedBeam
@@ -152,7 +166,7 @@ export default function Connect({ className }: ConnectProps) {
             reverse
             dotted
             gradientStartColor="#a855f7"
-            gradientStopColor="#c084fc"
+            gradientStopColor="#8b5cf6"
           />
           <AnimatedBeam
             containerRef={containerRef}
@@ -163,7 +177,7 @@ export default function Connect({ className }: ConnectProps) {
             reverse
             dotted
             gradientStartColor="#a855f7"
-            gradientStopColor="#c084fc"
+            gradientStopColor="#8b5cf6"
           />
         </div>
       </section>
