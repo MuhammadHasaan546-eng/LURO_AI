@@ -1,5 +1,6 @@
 import Background from "@/components/global/background";
 import Connect from "@/components/marketing/Connect";
+import Cta from "@/components/marketing/Cta";
 import Features from "@/components/marketing/Features";
 import Hero from "@/components/marketing/hero";
 import Perks from "@/components/marketing/perks";
@@ -59,6 +60,18 @@ const MarketingPage = () => {
       <Perks />
       <Pricing />
       <Testimonials />
+      <Cta
+        heading="Ready to try Luro?"
+        description="Start your free trial today and see how Luro can help you streamline your workflow."
+        primaryAction={{
+          label: "Start Free Trial",
+          href: "/signup",
+        }}
+        secondaryAction={{
+          label: "Learn More",
+          href: "/learn-more",
+        }}
+      />
     </main>
   );
 };
