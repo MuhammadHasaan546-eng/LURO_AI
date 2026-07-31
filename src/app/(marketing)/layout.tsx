@@ -1,7 +1,3 @@
-// import { inter, satoshi } from "@/constants";
-// import { Toaster } from "@/components/ui/sonner";
-// import { Providers } from "@/components";
-
 import "../style/global.css";
 
 import { cn } from "@/functions/cs";
@@ -9,7 +5,6 @@ import { generateMetadata } from "@/functions/metadata";
 import { Toaster } from "sonner";
 import Providers from "@/components/global/providers";
 import { inter, satoshi } from "../constant/font";
-import "../globals.css";
 import { Navbar } from "@/components/marketing/Navbar";
 
 export const metadata = generateMetadata();
@@ -20,10 +15,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body
         className={cn(
-          "min-h-screen bg-background text-foreground antialiased font-default",
+          "min-h-screen bg-[#09090b] text-white antialiased font-default selection:bg-violet-500/30",
           inter.variable,
           satoshi.variable,
         )}

@@ -126,3 +126,12 @@
     @apply font-sans;
   }
 }
+
+@keyframes spotlight {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.7;
+  }
+}
