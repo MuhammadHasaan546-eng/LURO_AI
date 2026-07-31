@@ -6,6 +6,7 @@ import { Toaster } from "sonner";
 import Providers from "@/components/global/providers";
 import { inter, satoshi } from "../constant/font";
 import { Navbar } from "@/components/marketing/Navbar";
+import Footer from "@/components/marketing/Footer";
 
 export const metadata = generateMetadata();
 
@@ -26,6 +27,7 @@ export default function RootLayout({
         <Toaster richColors theme="dark" position="top-right" />
         <Navbar />
         <Providers>{children}</Providers>
+        <Footer />
       </body>
     </html>
   );
