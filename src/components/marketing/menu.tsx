@@ -27,6 +27,7 @@ type MenuProps = {
   activeHash: string;
   onSelect: (href: string) => void;
   mobile?: boolean;
+  inverted?: boolean;
 };
 
 const featureList = [
@@ -72,9 +73,22 @@ const resourceList = [
   },
 ];
 
-export function Menu({ activeHash, onSelect, mobile = false }: MenuProps) {
+export function Menu({
+  activeHash,
+  onSelect,
+  mobile = false,
+  inverted = false,
+}: MenuProps) {
   const [openMobileFeatures, setOpenMobileFeatures] = useState(false);
   const [openMobileResources, setOpenMobileResources] = useState(false);
+
+  // Styling helper for desktop item states
+  const linkStyle = inverted
+    ? "text-slate-300 hover:bg-white/10 hover:text-white"
+    : "text-slate-200 hover:bg-violet-500/10 hover:text-white";
+
+  const activeLinkStyle =
+    "bg-violet-600/20 text-violet-300 font-semibold border border-violet-500/30";
 
   // --- MOBILE LAYOUT ---
   if (mobile) {
@@ -85,36 +99,36 @@ export function Menu({ activeHash, onSelect, mobile = false }: MenuProps) {
           href="#how-it-works"
           onClick={() => onSelect("#how-it-works")}
           className={cn(
-            "flex h-11 w-full items-center rounded-xl px-4 text-sm font-medium transition-colors",
+            "flex h-10 w-full items-center rounded-xl px-4 text-xs font-medium transition-all",
             activeHash === "#how-it-works"
-              ? "bg-black/10 font-semibold text-black"
-              : "text-black/80 hover:bg-black/5 hover:text-black",
+              ? activeLinkStyle
+              : "text-slate-300 hover:bg-white/5 hover:text-white",
           )}
         >
           How to start
         </Link>
 
         {/* 2. Features Accordion */}
-        <div className="overflow-hidden rounded-xl border border-black/5 bg-black/[0.02]">
+        <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-900/40">
           <button
             type="button"
             onClick={() => setOpenMobileFeatures((prev) => !prev)}
-            className="flex h-11 w-full items-center justify-between px-4 text-sm font-medium text-black/80 hover:text-black"
+            className="flex h-10 w-full items-center justify-between px-4 text-xs font-medium text-slate-300 hover:text-white"
           >
             <span className="flex items-center gap-2">
-              <Sparkles className="size-4 text-amber-500" />
+              <Sparkles className="size-3.5 text-violet-400" />
               Features
             </span>
             <ChevronDown
               className={cn(
-                "size-4 text-black/50 transition-transform duration-200",
+                "size-3.5 text-slate-400 transition-transform duration-200",
                 openMobileFeatures && "rotate-180",
               )}
             />
           </button>
 
           {openMobileFeatures && (
-            <div className="flex flex-col gap-1.5 p-2 pt-0">
+            <div className="flex flex-col gap-1 p-2 pt-0">
               {featureList.map((item) => {
                 const Icon = item.icon;
                 return (
@@ -122,23 +136,23 @@ export function Menu({ activeHash, onSelect, mobile = false }: MenuProps) {
                     key={item.title}
                     href={item.href}
                     onClick={() => onSelect(item.href)}
-                    className="group flex items-start gap-3 rounded-lg p-2.5 transition-colors hover:bg-white hover:shadow-sm"
+                    className="group flex items-start gap-3 rounded-lg p-2 transition-all hover:bg-violet-500/10"
                   >
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-black/5 text-black transition-colors group-hover:bg-black group-hover:text-white">
-                      <Icon className="size-4" />
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-slate-950 text-violet-400 group-hover:border-violet-500/30 group-hover:bg-violet-600 group-hover:text-white transition-all">
+                      <Icon className="size-3.5" />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-gray-900">
+                        <span className="text-xs font-semibold text-slate-200 group-hover:text-white">
                           {item.title}
                         </span>
                         {item.badge && (
-                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                          <span className="rounded-full bg-violet-500/20 px-1.5 py-0.5 text-[9px] font-bold text-violet-300 border border-violet-500/30">
                             {item.badge}
                           </span>
                         )}
                       </div>
-                      <p className="mt-0.5 text-xs leading-snug text-gray-500">
+                      <p className="mt-0.5 text-[11px] leading-snug text-slate-400">
                         {item.description}
                       </p>
                     </div>
@@ -154,10 +168,10 @@ export function Menu({ activeHash, onSelect, mobile = false }: MenuProps) {
           href="#pricing"
           onClick={() => onSelect("#pricing")}
           className={cn(
-            "flex h-11 w-full items-center rounded-xl px-4 text-sm font-medium transition-colors",
+            "flex h-10 w-full items-center rounded-xl px-4 text-xs font-medium transition-all",
             activeHash === "#pricing"
-              ? "bg-black/10 font-semibold text-black"
-              : "text-black/80 hover:bg-black/5 hover:text-black",
+              ? activeLinkStyle
+              : "text-slate-300 hover:bg-white/5 hover:text-white",
           )}
         >
           Pricing
@@ -168,33 +182,33 @@ export function Menu({ activeHash, onSelect, mobile = false }: MenuProps) {
           href="#integrations"
           onClick={() => onSelect("#integrations")}
           className={cn(
-            "flex h-11 w-full items-center rounded-xl px-4 text-sm font-medium transition-colors",
+            "flex h-10 w-full items-center rounded-xl px-4 text-xs font-medium transition-all",
             activeHash === "#integrations"
-              ? "bg-black/10 font-semibold text-black"
-              : "text-black/80 hover:bg-black/5 hover:text-black",
+              ? activeLinkStyle
+              : "text-slate-300 hover:bg-white/5 hover:text-white",
           )}
         >
           Integrations
         </Link>
 
         {/* 5. Resources Accordion */}
-        <div className="overflow-hidden rounded-xl border border-black/5 bg-black/[0.02]">
+        <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-900/40">
           <button
             type="button"
             onClick={() => setOpenMobileResources((prev) => !prev)}
-            className="flex h-11 w-full items-center justify-between px-4 text-sm font-medium text-black/80 hover:text-black"
+            className="flex h-10 w-full items-center justify-between px-4 text-xs font-medium text-slate-300 hover:text-white"
           >
             <span>Resources</span>
             <ChevronDown
               className={cn(
-                "size-4 text-black/50 transition-transform duration-200",
+                "size-3.5 text-slate-400 transition-transform duration-200",
                 openMobileResources && "rotate-180",
               )}
             />
           </button>
 
           {openMobileResources && (
-            <div className="flex flex-col gap-1.5 p-2 pt-0">
+            <div className="flex flex-col gap-1 p-2 pt-0">
               {resourceList.map((item) => {
                 const Icon = item.icon;
                 return (
@@ -202,16 +216,16 @@ export function Menu({ activeHash, onSelect, mobile = false }: MenuProps) {
                     key={item.title}
                     href={item.href}
                     onClick={() => onSelect(item.href)}
-                    className="group flex items-start gap-3 rounded-lg p-2.5 transition-colors hover:bg-white hover:shadow-sm"
+                    className="group flex items-start gap-3 rounded-lg p-2 transition-all hover:bg-violet-500/10"
                   >
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-black/5 text-black transition-colors group-hover:bg-black group-hover:text-white">
-                      <Icon className="size-4" />
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-slate-950 text-violet-400 group-hover:border-violet-500/30 group-hover:bg-violet-600 group-hover:text-white transition-all">
+                      <Icon className="size-3.5" />
                     </div>
                     <div className="flex-1">
-                      <span className="text-sm font-semibold text-gray-900">
+                      <span className="text-xs font-semibold text-slate-200 group-hover:text-white">
                         {item.title}
                       </span>
-                      <p className="mt-0.5 text-xs leading-snug text-gray-500">
+                      <p className="mt-0.5 text-[11px] leading-snug text-slate-400">
                         {item.description}
                       </p>
                     </div>
@@ -228,7 +242,7 @@ export function Menu({ activeHash, onSelect, mobile = false }: MenuProps) {
   // --- DESKTOP LAYOUT ---
   return (
     <NavigationMenu className="relative z-50 mx-auto">
-      <NavigationMenuList className="flex items-center justify-center gap-1 sm:gap-2">
+      <NavigationMenuList className="flex items-center justify-center gap-1">
         {/* How to start */}
         <NavigationMenuItem>
           <NavigationMenuLink asChild>
@@ -236,10 +250,8 @@ export function Menu({ activeHash, onSelect, mobile = false }: MenuProps) {
               href="#how-it-works"
               onClick={() => onSelect("#how-it-works")}
               className={cn(
-                "flex h-10 items-center rounded-full px-4 text-sm font-medium transition-colors",
-                activeHash === "#how-it-works"
-                  ? "bg-black/10 font-semibold text-black"
-                  : "text-black/70 hover:bg-black/5 hover:text-black",
+                "flex h-9 items-center rounded-xl px-3.5 text-xs font-semibold transition-all",
+                activeHash === "#how-it-works" ? activeLinkStyle : linkStyle,
               )}
             >
               How to start
@@ -251,16 +263,14 @@ export function Menu({ activeHash, onSelect, mobile = false }: MenuProps) {
         <NavigationMenuItem>
           <NavigationMenuTrigger
             className={cn(
-              "h-10 rounded-full bg-transparent px-4 text-sm font-medium transition-colors",
-              activeHash === "#features"
-                ? "bg-black/10 font-semibold text-black"
-                : "text-black/70 hover:bg-black/5 hover:text-black",
+              "h-9 rounded-xl bg-transparent px-3.5 text-xs font-semibold transition-all focus:bg-transparent active:bg-transparent data-[state=open]:bg-violet-500/10 data-[state=open]:text-white",
+              activeHash === "#features" ? activeLinkStyle : linkStyle,
             )}
           >
             Features
           </NavigationMenuTrigger>
-          <NavigationMenuContent className="w-[380px] sm:w-[420px] rounded-2xl border border-black/10 bg-white/95 p-3 shadow-2xl backdrop-blur-lg">
-            <ul className="grid gap-1.5">
+          <NavigationMenuContent className="w-[360px] sm:w-[400px] rounded-2xl border border-violet-500/20 bg-slate-950/95 p-2 shadow-2xl shadow-violet-950/50 backdrop-blur-xl">
+            <ul className="grid gap-1">
               {featureList.map((feature) => {
                 const Icon = feature.icon;
                 return (
@@ -269,23 +279,23 @@ export function Menu({ activeHash, onSelect, mobile = false }: MenuProps) {
                       <Link
                         href={feature.href}
                         onClick={() => onSelect(feature.href)}
-                        className="group flex items-start gap-3.5 rounded-xl p-3 transition-colors hover:bg-black/[0.04]"
+                        className="group flex items-start gap-3 rounded-xl p-2.5 transition-all hover:bg-violet-500/10"
                       >
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-black/5 text-black transition-colors group-hover:bg-black group-hover:text-white">
-                          <Icon className="size-5" />
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-slate-900 text-violet-400 group-hover:border-violet-500/40 group-hover:bg-violet-600 group-hover:text-white transition-all shadow-sm">
+                          <Icon className="size-4" />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-gray-900 group-hover:text-black">
+                            <span className="text-xs font-bold text-slate-200 group-hover:text-white">
                               {feature.title}
                             </span>
                             {feature.badge && (
-                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                              <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[9px] font-bold text-violet-300 border border-violet-500/30">
                                 {feature.badge}
                               </span>
                             )}
                           </div>
-                          <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+                          <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">
                             {feature.description}
                           </p>
                         </div>
@@ -305,10 +315,8 @@ export function Menu({ activeHash, onSelect, mobile = false }: MenuProps) {
               href="#pricing"
               onClick={() => onSelect("#pricing")}
               className={cn(
-                "flex h-10 items-center rounded-full px-4 text-sm font-medium transition-colors",
-                activeHash === "#pricing"
-                  ? "bg-black/10 font-semibold text-black"
-                  : "text-black/70 hover:bg-black/5 hover:text-black",
+                "flex h-9 items-center rounded-xl px-3.5 text-xs font-semibold transition-all",
+                activeHash === "#pricing" ? activeLinkStyle : linkStyle,
               )}
             >
               Pricing
@@ -323,10 +331,8 @@ export function Menu({ activeHash, onSelect, mobile = false }: MenuProps) {
               href="#integrations"
               onClick={() => onSelect("#integrations")}
               className={cn(
-                "flex h-10 items-center rounded-full px-4 text-sm font-medium transition-colors",
-                activeHash === "#integrations"
-                  ? "bg-black/10 font-semibold text-black"
-                  : "text-black/70 hover:bg-black/5 hover:text-black",
+                "flex h-9 items-center rounded-xl px-3.5 text-xs font-semibold transition-all",
+                activeHash === "#integrations" ? activeLinkStyle : linkStyle,
               )}
             >
               Integrations
@@ -338,16 +344,14 @@ export function Menu({ activeHash, onSelect, mobile = false }: MenuProps) {
         <NavigationMenuItem>
           <NavigationMenuTrigger
             className={cn(
-              "h-10 rounded-full bg-transparent px-4 text-sm font-medium transition-colors",
-              activeHash === "#resources"
-                ? "bg-black/10 font-semibold text-black"
-                : "text-black/70 hover:bg-black/5 hover:text-black",
+              "h-9 rounded-xl bg-transparent px-3.5 text-xs font-semibold transition-all focus:bg-transparent active:bg-transparent data-[state=open]:bg-violet-500/10 data-[state=open]:text-white",
+              activeHash === "#resources" ? activeLinkStyle : linkStyle,
             )}
           >
             Resources
           </NavigationMenuTrigger>
-          <NavigationMenuContent className="w-[380px] sm:w-[420px] rounded-2xl border border-black/10 bg-white/95 p-3 shadow-2xl backdrop-blur-lg">
-            <ul className="grid gap-1.5">
+          <NavigationMenuContent className="w-[360px] sm:w-[400px] rounded-2xl border border-violet-500/20 bg-slate-950/95 p-2 shadow-2xl shadow-violet-950/50 backdrop-blur-xl">
+            <ul className="grid gap-1">
               {resourceList.map((resource) => {
                 const Icon = resource.icon;
                 return (
@@ -356,16 +360,16 @@ export function Menu({ activeHash, onSelect, mobile = false }: MenuProps) {
                       <Link
                         href={resource.href}
                         onClick={() => onSelect(resource.href)}
-                        className="group flex items-start gap-3.5 rounded-xl p-3 transition-colors hover:bg-black/[0.04]"
+                        className="group flex items-start gap-3 rounded-xl p-2.5 transition-all hover:bg-violet-500/10"
                       >
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-black/5 text-black transition-colors group-hover:bg-black group-hover:text-white">
-                          <Icon className="size-5" />
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-slate-900 text-violet-400 group-hover:border-violet-500/40 group-hover:bg-violet-600 group-hover:text-white transition-all shadow-sm">
+                          <Icon className="size-4" />
                         </div>
                         <div className="flex-1">
-                          <span className="text-sm font-semibold text-gray-900 group-hover:text-black">
+                          <span className="text-xs font-bold text-slate-200 group-hover:text-white">
                             {resource.title}
                           </span>
-                          <p className="mt-0.5 text-xs leading-relaxed text-gray-500">
+                          <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">
                             {resource.description}
                           </p>
                         </div>
