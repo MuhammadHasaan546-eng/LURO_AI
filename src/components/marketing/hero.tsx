@@ -1,6 +1,7 @@
 import Container from "@/components/global/container";
 import Link from "next/link";
 import React from "react";
+import { SparklesText } from "../ui/sparkles-text";
 
 const ArrowIcon = () => (
   <svg
@@ -47,16 +48,18 @@ const Hero = () => {
 
       {/* Main Heading */}
       <Container delay={0.08} className="!h-auto">
-        <h1
-          id="hero-heading"
-          className="mx-auto mt-6 max-w-4xl text-balance text-[clamp(2.5rem,7vw,5rem)] font-extrabold leading-[1.05] tracking-tight text-white"
-        >
-          Supercharge Your{" "}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 via-pink-400 to-amber-300">
-            Social Media
-          </span>{" "}
-          with AI Intelligence
-        </h1>
+        <SparklesText>
+          <h1
+            id="hero-heading"
+            className="mx-auto mt-6 max-w-4xl text-balance text-[clamp(2.5rem,7vw,5rem)] font-extrabold leading-[1.05] tracking-tight text-white"
+          >
+            Supercharge Your{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 via-pink-400 to-amber-300">
+              Social Media
+            </span>{" "}
+            with AI Intelligence
+          </h1>
+        </SparklesText>
       </Container>
 
       {/* Subtitle Description */}

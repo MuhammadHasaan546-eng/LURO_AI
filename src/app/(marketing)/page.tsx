@@ -3,6 +3,8 @@ import Connect from "@/components/marketing/Connect";
 import Features from "@/components/marketing/Features";
 import Hero from "@/components/marketing/hero";
 import Perks from "@/components/marketing/perks";
+import Pricing from "@/components/marketing/Pricing";
+import Testimonials from "@/components/marketing/Reviews";
 import { TrustedCompanies } from "@/components/marketing/TrustedCompanies";
 import Spotlight from "@/components/ui/spotlightBackground";
 import Image from "next/image";
@@ -55,6 +57,8 @@ const MarketingPage = () => {
       <Connect />
       <Features />
       <Perks />
+      <Pricing />
+      <Testimonials />
     </main>
   );
 };
