@@ -2,6 +2,7 @@ import Background from "@/components/global/background";
 import Connect from "@/components/marketing/Connect";
 import Features from "@/components/marketing/Features";
 import Hero from "@/components/marketing/hero";
+import Perks from "@/components/marketing/perks";
 import { TrustedCompanies } from "@/components/marketing/TrustedCompanies";
 import Spotlight from "@/components/ui/spotlightBackground";
 import Image from "next/image";
@@ -53,6 +54,7 @@ const MarketingPage = () => {
       <TrustedCompanies />
       <Connect />
       <Features />
+      <Perks />
     </main>
   );
 };
