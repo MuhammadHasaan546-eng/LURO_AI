@@ -1,4 +1,5 @@
 import Background from "@/components/global/background";
+import Connect from "@/components/marketing/Connect";
 import Hero from "@/components/marketing/hero";
 import { TrustedCompanies } from "@/components/marketing/TrustedCompanies";
 import Spotlight from "@/components/ui/spotlight";
@@ -48,7 +49,9 @@ const MarketingPage = () => {
           </div>
         </div>
       </section>
+
       <TrustedCompanies />
+      <Connect />
     </main>
   );
 };
