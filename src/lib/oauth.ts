@@ -1,8 +1,17 @@
 import { createHash } from "node:crypto";
+import { OAuthProvider } from "@prisma/client";
 import { SignJWT, createRemoteJWKSet, jwtVerify } from "jose";
 import { env } from "@/lib/env";
 
-export type ProviderName = "google" | "apple";
+export const oauthProviders = {
+  google: OAuthProvider.GOOGLE,
+  apple: OAuthProvider.APPLE,
+} as const;
+
+export type ProviderName = keyof typeof oauthProviders;
+
+export const isProviderName = (value: string): value is ProviderName =>
+  Object.hasOwn(oauthProviders, value);
 export type VerifiedIdentity = {
   subject: string;
   email: string | null;

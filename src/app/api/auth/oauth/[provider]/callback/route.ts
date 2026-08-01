@@ -1,19 +1,11 @@
 import { NextResponse } from "next/server";
-import { OAuthProvider } from "@prisma/client";
 import { db } from "@/lib/db";
+import { env } from "@/lib/env";
 import { audit, createSession, getCurrentSession, hashToken } from "@/lib/auth";
-import { exchangeAndVerify, type ProviderName } from "@/lib/oauth";
-
-const providerMap = {
-  google: OAuthProvider.GOOGLE,
-  apple: OAuthProvider.APPLE,
-} as const;
+import { exchangeAndVerify, isProviderName, oauthProviders } from "@/lib/oauth";
 const fallback = (message: string) =>
   NextResponse.redirect(
-    new URL(
-      `/auth/signin?error=${encodeURIComponent(message)}`,
-      process.env.APP_URL ?? "http://localhost:3000",
-    ),
+    new URL(`/auth/signin?error=${encodeURIComponent(message)}`, env.APP_URL),
   );
 
 export async function GET(
@@ -21,9 +13,9 @@ export async function GET(
   context: { params: Promise<{ provider: string }> },
 ) {
   const { provider: providerName } = await context.params;
-  if (!(providerName in providerMap))
+  if (!isProviderName(providerName))
     return fallback("Unsupported sign-in provider.");
-  const provider = providerMap[providerName as ProviderName];
+  const provider = oauthProviders[providerName];
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
@@ -41,7 +33,7 @@ export async function GET(
   await db.oAuthChallenge.delete({ where: { id: challenge.id } });
   try {
     const identity = await exchangeAndVerify(
-      providerName as ProviderName,
+      providerName,
       code,
       challenge.codeVerifier,
       challenge.nonceHash,

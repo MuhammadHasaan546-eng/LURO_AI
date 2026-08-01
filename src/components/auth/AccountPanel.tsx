@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 
 type Account = {
@@ -50,7 +51,8 @@ export default function AccountPanel() {
       body: body ? JSON.stringify(body) : undefined,
     });
     const result = await response.json();
-    response.ok ? toast.success(result.message) : toast.error(result.message);
+    if (response.ok) toast.success(result.message);
+    else toast.error(result.message);
     if (response.ok) await load();
     return response.ok;
   };
@@ -137,18 +139,18 @@ export default function AccountPanel() {
           ))}
         </div>
         <div className="mt-4 flex gap-2">
-          <a
+          <Link
             href="/api/auth/oauth/google?returnTo=/account"
             className="rounded-lg border border-white/15 px-3 py-2 text-sm"
           >
             Link Google
-          </a>
-          <a
+          </Link>
+          <Link
             href="/api/auth/oauth/apple?returnTo=/account"
             className="rounded-lg border border-white/15 px-3 py-2 text-sm"
           >
             Link Apple
-          </a>
+          </Link>
         </div>
         <form
           className="mt-5 grid gap-3"

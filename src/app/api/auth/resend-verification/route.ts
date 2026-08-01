@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentSession, issueAuthToken, requireCsrf } from "@/lib/auth";
+import { issueAuthToken, requireCsrf } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 export async function POST(request: Request) {

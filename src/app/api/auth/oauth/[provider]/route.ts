@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createHash, randomBytes } from "node:crypto";
-import { OAuthProvider } from "@prisma/client";
+import { oauthProviders, isProviderName } from "@/lib/oauth";
 import { db } from "@/lib/db";
 import { env, isAppleEnabled, isGoogleEnabled } from "@/lib/env";
 import { getCurrentSession, hashToken } from "@/lib/auth";
@@ -9,13 +9,13 @@ import { checkRateLimit } from "@/lib/rate-limit";
 const providerConfig = {
   google: {
     enabled: isGoogleEnabled,
-    provider: OAuthProvider.GOOGLE,
+    provider: oauthProviders.google,
     authorization: "https://accounts.google.com/o/oauth2/v2/auth",
     scope: "openid email profile",
   },
   apple: {
     enabled: isAppleEnabled,
-    provider: OAuthProvider.APPLE,
+    provider: oauthProviders.apple,
     authorization: "https://appleid.apple.com/auth/authorize",
     scope: "name email",
   },
@@ -31,7 +31,13 @@ export async function GET(
   context: { params: Promise<{ provider: string }> },
 ) {
   const { provider: providerName } = await context.params;
-  const config = providerConfig[providerName as keyof typeof providerConfig];
+  if (!isProviderName(providerName)) {
+    return NextResponse.json(
+      { message: "Unsupported sign-in provider." },
+      { status: 404 },
+    );
+  }
+  const config = providerConfig[providerName];
   if (!config?.enabled)
     return NextResponse.json(
       { message: "This sign-in provider is not configured." },
