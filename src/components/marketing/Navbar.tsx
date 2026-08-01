@@ -124,13 +124,13 @@ export const Navbar = () => {
           {/* Action Buttons */}
           <div className="hidden shrink-0 items-center gap-2.5 md:flex">
             <Link
-              href="/login"
+              href="/auth/signin"
               className="inline-flex h-9 items-center justify-center rounded-xl px-4 text-xs font-semibold text-slate-300 transition-all duration-200 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
             >
               Log in
             </Link>
             <Link
-              href="/signup"
+              href="/auth/signup"
               className="group inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-pink-600 px-4 text-xs font-semibold text-white shadow-md shadow-violet-950/50 transition-all duration-200 hover:scale-[1.02] hover:from-violet-500 hover:to-pink-500 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
             >
               Start free
