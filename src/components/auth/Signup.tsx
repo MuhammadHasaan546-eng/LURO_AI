@@ -249,6 +249,25 @@ export const SignUpPage = () => {
         </button>
       </form>
 
+      <div className="flex items-center gap-3 text-xs text-gray-500">
+        <span className="h-px flex-1 bg-white/10" />
+        or sign up with
+        <span className="h-px flex-1 bg-white/10" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <a
+          href="/api/auth/oauth/google"
+          className="rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm font-medium hover:bg-white/10"
+        >
+          Google
+        </a>
+        <a
+          href="/api/auth/oauth/apple"
+          className="rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm font-medium hover:bg-white/10"
+        >
+          Apple
+        </a>
+      </div>
       <div className="text-xs text-gray-400 pt-2">
         Already have an account?{" "}
         <Link

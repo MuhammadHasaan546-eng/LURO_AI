@@ -1,94 +1,180 @@
-import { createHash, randomBytes } from "node:crypto";
-
-import bcrypt from "bcryptjs";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
-
+import argon2 from "argon2";
 import { db } from "@/lib/db";
+import { env } from "@/lib/env";
 
 export const SESSION_COOKIE_NAME = "luro_session";
+export const CSRF_COOKIE_NAME = "luro_csrf";
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const IDLE_TTL_MS = 24 * 60 * 60 * 1000;
+const TOKEN_BYTES = 32;
+const tokenPattern = /^[a-f0-9]{64}$/;
 
-const BCRYPT_ROUNDS = 12;
-const SESSION_TOKEN_BYTES = 32;
-const SESSION_TOKEN_LENGTH = SESSION_TOKEN_BYTES * 2;
-const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
-const SESSION_TOKEN_PATTERN = /^[a-f0-9]+$/;
+export const hashToken = (token: string) =>
+  createHash("sha256").update(token).digest("hex");
+export const hashIp = (value: string | null) =>
+  value
+    ? createHmac("sha256", env.AUTH_SECRET ?? "development-only-auth-key")
+        .update(value)
+        .digest("hex")
+    : null;
+export const isValidToken = (token: string | undefined) =>
+  Boolean(token && tokenPattern.test(token));
+export const hashPassword = (password: string) =>
+  argon2.hash(password, {
+    type: argon2.argon2id,
+    memoryCost: 19456,
+    timeCost: 2,
+    parallelism: 1,
+  });
+export const verifyPassword = (password: string, hash: string) =>
+  argon2.verify(hash, password);
 
-const sessionCookieOptions = (expires: Date) => ({
+const cookieOptions = (expires: Date) => ({
   httpOnly: true,
   sameSite: "lax" as const,
-  secure: process.env.NODE_ENV === "production",
+  secure: env.NODE_ENV === "production",
   path: "/",
   expires,
 });
 
-export const hashPassword = (password: string) =>
-  bcrypt.hash(password, BCRYPT_ROUNDS);
-
-export const verifyPassword = (password: string, passwordHash: string) =>
-  bcrypt.compare(password, passwordHash);
-
-export const isValidSessionToken = (token: string) =>
-  token.length === SESSION_TOKEN_LENGTH && SESSION_TOKEN_PATTERN.test(token);
-
-export const hashSessionToken = (token: string) =>
-  createHash("sha256").update(token).digest("hex");
-
-export const createSession = async (userId: string) => {
-  const token = randomBytes(SESSION_TOKEN_BYTES).toString("hex");
-  const tokenHash = hashSessionToken(token);
-  const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
+export const createSession = async (userId: string, request?: Request) => {
+  const sessionToken = randomBytes(TOKEN_BYTES).toString("hex");
+  const csrfToken = randomBytes(TOKEN_BYTES).toString("hex");
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
+  const idleExpiresAt = new Date(now.getTime() + IDLE_TTL_MS);
+  const userAgent = request?.headers.get("user-agent")?.slice(0, 500);
+  const ip =
+    request?.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    request?.headers.get("x-real-ip") ??
+    null;
 
   await db.session.create({
     data: {
-      tokenHash,
+      tokenHash: hashToken(sessionToken),
+      csrfTokenHash: hashToken(csrfToken),
       userId,
       expiresAt,
+      idleExpiresAt,
+      userAgent,
+      ipAddressHash: hashIp(ip),
     },
   });
-
-  const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE_NAME, token, sessionCookieOptions(expiresAt));
-
-  return expiresAt;
+  const store = await cookies();
+  store.set(SESSION_COOKIE_NAME, sessionToken, cookieOptions(expiresAt));
+  store.set(CSRF_COOKIE_NAME, csrfToken, {
+    ...cookieOptions(expiresAt),
+    httpOnly: false,
+  });
+  return { expiresAt, csrfToken };
 };
 
 export const getCurrentSession = async () => {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-
-  if (!token || !isValidSessionToken(token)) {
-    return null;
-  }
-
+  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
+  if (!isValidToken(token)) return null;
   const session = await db.session.findUnique({
-    where: { tokenHash: hashSessionToken(token) },
-    include: { user: true },
+    where: { tokenHash: hashToken(token!) },
+    include: { user: { include: { identities: true } } },
   });
-
-  if (!session) {
+  if (
+    !session ||
+    session.revokedAt ||
+    session.expiresAt <= new Date() ||
+    session.idleExpiresAt <= new Date()
+  ) {
+    if (session)
+      await db.session
+        .update({ where: { id: session.id }, data: { revokedAt: new Date() } })
+        .catch(() => undefined);
     return null;
   }
-
-  if (session.expiresAt <= new Date()) {
-    await db.session.deleteMany({ where: { id: session.id } });
-    return null;
-  }
-
   return session;
 };
 
+export const requireCsrf = async (request: Request) => {
+  const header = request.headers.get("x-csrf-token");
+  const session = await getCurrentSession();
+  if (!session || !header || !isValidToken(header)) return null;
+  return hashToken(header) === session.csrfTokenHash ? session : null;
+};
+
 export const deleteCurrentSession = async () => {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-
-  if (token && isValidSessionToken(token)) {
-    await db.session.deleteMany({
-      where: { tokenHash: hashSessionToken(token) },
+  const store = await cookies();
+  const token = store.get(SESSION_COOKIE_NAME)?.value;
+  if (isValidToken(token))
+    await db.session.updateMany({
+      where: { tokenHash: hashToken(token!), revokedAt: null },
+      data: { revokedAt: new Date() },
     });
-  }
-
-  cookieStore.set(SESSION_COOKIE_NAME, "", {
-    ...sessionCookieOptions(new Date(0)),
+  store.set(SESSION_COOKIE_NAME, "", {
+    ...cookieOptions(new Date(0)),
+    maxAge: 0,
+  });
+  store.set(CSRF_COOKIE_NAME, "", {
+    ...cookieOptions(new Date(0)),
+    httpOnly: false,
     maxAge: 0,
   });
 };
+
+export const deleteAllSessions = async (userId: string) =>
+  db.session.updateMany({
+    where: { userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+export const issueAuthToken = async (
+  userId: string,
+  purpose: "VERIFY_EMAIL" | "RESET_PASSWORD",
+  ttlMs: number,
+) => {
+  const token = randomBytes(TOKEN_BYTES).toString("hex");
+  await db.authToken.create({
+    data: {
+      tokenHash: hashToken(token),
+      purpose,
+      userId,
+      expiresAt: new Date(Date.now() + ttlMs),
+    },
+  });
+  return token;
+};
+export const consumeAuthToken = async (
+  token: string,
+  purpose: "VERIFY_EMAIL" | "RESET_PASSWORD",
+) => {
+  if (!isValidToken(token)) return null;
+  const record = await db.authToken.findUnique({
+    where: { tokenHash: hashToken(token) },
+  });
+  if (
+    !record ||
+    record.purpose !== purpose ||
+    record.usedAt ||
+    record.expiresAt <= new Date()
+  )
+    return null;
+  const updated = await db.authToken.updateMany({
+    where: { id: record.id, usedAt: null },
+    data: { usedAt: new Date() },
+  });
+  return updated.count === 1 ? record.userId : null;
+};
+export const audit = (
+  event: string,
+  outcome: "SUCCESS" | "FAILURE",
+  userId?: string,
+  request?: Request,
+) =>
+  db.auditEvent.create({
+    data: {
+      event,
+      outcome,
+      userId,
+      userAgent: request?.headers.get("user-agent")?.slice(0, 500),
+      ipAddressHash: hashIp(
+        request?.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+      ),
+    },
+  });

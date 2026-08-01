@@ -1,10 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useClerk } from "@clerk/nextjs";
+import { usePathname, useRouter } from "next/navigation";
 import { LogOut, SearchIcon } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   Sidebar,
@@ -25,8 +25,27 @@ import Container from "../global/container";
 
 export const DashboardSidebar = () => {
   const pathname = usePathname();
-  const { signOut } = useClerk();
+  const router = useRouter();
   const { isMobile, setOpen, setOpenMobile } = useSidebar();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+
+    try {
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+
+      if (!response.ok) {
+        throw new Error("Logout request failed");
+      }
+
+      router.replace("/auth/signin");
+      router.refresh();
+    } catch {
+      toast.error("Unable to log out. Please try again.");
+      setIsLoggingOut(false);
+    }
+  };
 
   const expandDesktopSidebar = () => {
     if (!isMobile) setOpen(true);
@@ -108,11 +127,12 @@ export const DashboardSidebar = () => {
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="Logout"
-              onClick={() => signOut({ redirectUrl: "/" })}
+              onClick={handleLogout}
+              disabled={isLoggingOut}
               className="text-destructive hover:text-destructive hover:bg-destructive/10"
             >
               <LogOut className="size-4 shrink-0" />
-              <span>Logout</span>
+              <span>{isLoggingOut ? "Logging out..." : "Logout"}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

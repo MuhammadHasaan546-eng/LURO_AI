@@ -179,14 +179,14 @@ export const Navbar = () => {
               <Menu activeHash={activeHash} onSelect={selectItem} mobile />
               <div className="grid grid-cols-2 gap-2.5 border-t border-white/10 pt-4">
                 <Link
-                  href="/login"
+                  href="/auth/signin"
                   onClick={() => setIsOpen(false)}
                   className="flex h-10 items-center justify-center rounded-xl border border-white/10 text-xs font-semibold text-slate-300 transition-all hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
                 >
                   Log in
                 </Link>
                 <Link
-                  href="/signup"
+                  href="/auth/signup"
                   onClick={() => setIsOpen(false)}
                   className="group flex h-10 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-pink-600 text-xs font-semibold text-white shadow-md transition-all hover:from-violet-500 hover:to-pink-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
                 >

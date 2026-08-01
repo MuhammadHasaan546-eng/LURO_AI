@@ -1,11 +1,6 @@
 "use client";
 import { cn } from "@/lib/utils";
 import React, { useRef, useState, useContext, createContext } from "react";
-interface MousePosition {
-  x: number;
-  y: number;
-}
-
 interface SpotlightProps {
   children: React.ReactNode;
   className?: string;
@@ -60,12 +55,15 @@ export function SpotLightItem({ children, className }: SpotlightItemProps) {
     useSpotlight();
   const boxWrapper = useRef(null);
   const [isHovered, setIsHovered] = useState(false);
-  const [mousePosition, setMousePosition] = React.useState({
+  const [mousePosition, setMousePosition] = React.useState<{
+    x: number | null;
+    y: number | null;
+  }>({
     x: null,
     y: null,
   });
   React.useEffect(() => {
-    const updateMousePosition = (ev: { clientX: any; clientY: any }) => {
+    const updateMousePosition = (ev: globalThis.MouseEvent) => {
       setMousePosition({ x: ev.clientX, y: ev.clientY });
     };
     window.addEventListener("mousemove", updateMousePosition);

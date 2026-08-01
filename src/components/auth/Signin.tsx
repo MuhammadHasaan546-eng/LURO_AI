@@ -128,12 +128,20 @@ export const Signin = () => {
         </div>
 
         <div>
-          <label
-            className="text-xs text-gray-300 mb-1 block font-medium"
-            htmlFor="password"
-          >
-            Password
-          </label>
+          <div className="mb-1 flex items-center justify-between">
+            <label
+              className="text-xs text-gray-300 block font-medium"
+              htmlFor="password"
+            >
+              Password
+            </label>
+            <Link
+              href="/auth/forgot-password"
+              className="text-xs text-gray-300 underline underline-offset-4 hover:text-white"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <input
             id="password"
             type="password"
@@ -162,8 +170,27 @@ export const Signin = () => {
         </button>
       </form>
 
+      <div className="flex items-center gap-3 text-xs text-gray-500">
+        <span className="h-px flex-1 bg-white/10" />
+        or continue with
+        <span className="h-px flex-1 bg-white/10" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <a
+          href="/api/auth/oauth/google"
+          className="rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm font-medium hover:bg-white/10"
+        >
+          Google
+        </a>
+        <a
+          href="/api/auth/oauth/apple"
+          className="rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm font-medium hover:bg-white/10"
+        >
+          Apple
+        </a>
+      </div>
       <div className="text-xs text-gray-400 pt-2">
-        Don't have an account?{" "}
+        {"Don't have an account?"}{" "}
         <Link
           href="/auth/signup"
           className="text-white underline underline-offset-4 hover:text-gray-200"

@@ -74,7 +74,7 @@ const Hero = () => {
       <Container delay={0.24} className="!h-auto">
         <div className="mt-8 flex w-full flex-col items-stretch justify-center gap-3.5 sm:w-auto sm:flex-row sm:items-center">
           <Link
-            href="/signup"
+            href="/auth/signup"
             className="group inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-violet-500 to-pink-500 px-7 text-sm font-semibold text-white shadow-lg shadow-violet-500/25 transition-all duration-300 hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
           >
             Start Free Trial

@@ -1,0 +1,29 @@
+import { NextResponse } from "next/server";
+import { requireCsrf } from "@/lib/auth";
+import { db } from "@/lib/db";
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const session = await requireCsrf(request);
+  if (!session)
+    return NextResponse.json({ message: "Invalid request." }, { status: 403 });
+  const { id } = await context.params;
+  const identity = await db.providerIdentity.findFirst({
+    where: { id, userId: session.userId },
+  });
+  if (!identity)
+    return NextResponse.json(
+      { message: "Sign-in method not found." },
+      { status: 404 },
+    );
+  const methods =
+    session.user.identities.length + (session.user.passwordHash ? 1 : 0);
+  if (methods <= 1)
+    return NextResponse.json(
+      { message: "You cannot remove your final sign-in method." },
+      { status: 400 },
+    );
+  await db.providerIdentity.delete({ where: { id } });
+  return NextResponse.json({ message: "Sign-in method removed." });
+}
