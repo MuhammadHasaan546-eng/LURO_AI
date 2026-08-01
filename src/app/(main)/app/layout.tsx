@@ -1,13 +1,22 @@
+import { redirect } from "next/navigation";
+
 import DashboardNavbar from "@/components/dashboard/DashboardNavbar";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { getCurrentSession } from "@/lib/auth";
 
 interface Props {
   children: React.ReactNode;
 }
 
-const DashboardLayout = ({ children }: Props) => {
+const DashboardLayout = async ({ children }: Props) => {
+  const session = await getCurrentSession();
+
+  if (!session) {
+    redirect("/auth/signin");
+  }
+
   return (
     <TooltipProvider>
       <SidebarProvider defaultOpen={false}>
