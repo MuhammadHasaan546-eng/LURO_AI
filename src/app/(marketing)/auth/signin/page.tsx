@@ -7,10 +7,9 @@ import LiquidChrome from "@/components/ui/LiquidChrome";
 const SigninPage = () => {
   return (
     <main className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-black">
-      {/* 1. Animated Liquid Chrome Background */}
       <div className="absolute inset-0 z-0">
         <LiquidChrome
-          baseColor={[0.1, 0.1, 0.15]} // Dark sleek theme matching modern dark UI
+          baseColor={[0.1, 0.1, 0.15]}
           speed={0.25}
           amplitude={0.4}
           frequencyX={3}

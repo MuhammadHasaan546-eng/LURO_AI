@@ -1,45 +1,39 @@
-'use client'
-import { cn } from '@/lib/utils'
-import React, {
-  useRef,
-  useState,
-  MouseEvent,
-  useContext,
-  createContext,
-} from 'react'
+"use client";
+import { cn } from "@/lib/utils";
+import React, { useRef, useState, useContext, createContext } from "react";
 interface MousePosition {
-  x: number
-  y: number
+  x: number;
+  y: number;
 }
 
 interface SpotlightProps {
-  children: React.ReactNode
-  className?: string
-  ProximitySpotlight?: boolean
-  HoverFocusSpotlight?: boolean
-  CursorFlowGradient?: boolean
+  children: React.ReactNode;
+  className?: string;
+  ProximitySpotlight?: boolean;
+  HoverFocusSpotlight?: boolean;
+  CursorFlowGradient?: boolean;
 }
 interface SpotlightItemProps {
-  children: React.ReactNode
-  className?: string
+  children: React.ReactNode;
+  className?: string;
 }
 
 interface SpotLightContextType {
-  ProximitySpotlight: boolean
-  HoverFocusSpotlight: boolean
-  CursorFlowGradient: boolean
+  ProximitySpotlight: boolean;
+  HoverFocusSpotlight: boolean;
+  CursorFlowGradient: boolean;
 }
 
 const SpotLightContext = createContext<SpotLightContextType | undefined>(
-  undefined
-)
+  undefined,
+);
 export const useSpotlight = () => {
-  const context = useContext(SpotLightContext)
+  const context = useContext(SpotLightContext);
   if (!context) {
-    throw new Error('useSpotlight must be used within a SpotlightProvider')
+    throw new Error("useSpotlight must be used within a SpotlightProvider");
   }
-  return context
-}
+  return context;
+};
 export const Spotlight = ({
   children,
   className,
@@ -55,40 +49,44 @@ export const Spotlight = ({
         CursorFlowGradient,
       }}
     >
-      <div className={cn('group relative z-10 rounded-md    ', className)}>
+      <div className={cn("group relative z-10 rounded-md    ", className)}>
         {children}
       </div>
     </SpotLightContext.Provider>
-  )
-}
+  );
+};
 export function SpotLightItem({ children, className }: SpotlightItemProps) {
   const { HoverFocusSpotlight, ProximitySpotlight, CursorFlowGradient } =
-    useSpotlight()
-  const boxWrapper = useRef(null)
-  const [isHovered, setIsHovered] = useState(false)
+    useSpotlight();
+  const boxWrapper = useRef(null);
+  const [isHovered, setIsHovered] = useState(false);
   const [mousePosition, setMousePosition] = React.useState({
     x: null,
     y: null,
-  })
+  });
   React.useEffect(() => {
     const updateMousePosition = (ev: { clientX: any; clientY: any }) => {
-      setMousePosition({ x: ev.clientX, y: ev.clientY })
-    }
-    window.addEventListener('mousemove', updateMousePosition)
+      setMousePosition({ x: ev.clientX, y: ev.clientY });
+    };
+    window.addEventListener("mousemove", updateMousePosition);
     return () => {
-      window.removeEventListener('mousemove', updateMousePosition)
-    }
-  }, [])
+      window.removeEventListener("mousemove", updateMousePosition);
+    };
+  }, []);
 
-  const [overlayColor, setOverlayColor] = useState({ x: 0, y: 0 })
-  const handleMouemove = ({ currentTarget, clientX, clientY }): MouseEvent => {
-    let { left, top } = currentTarget.getBoundingClientRect()
+  const [overlayColor, setOverlayColor] = useState({ x: 0, y: 0 });
+  const handleMouemove = ({
+    currentTarget,
+    clientX,
+    clientY,
+  }: React.MouseEvent<HTMLDivElement>) => {
+    const { left, top } = currentTarget.getBoundingClientRect();
 
-    const x = clientX - left
-    const y = clientY - top
-
-    setOverlayColor({ x, y })
-  }
+    setOverlayColor({
+      x: clientX - left,
+      y: clientY - top,
+    });
+  };
   // console.log(overlayColor)
 
   return (
@@ -99,7 +97,7 @@ export function SpotLightItem({ children, className }: SpotlightItemProps) {
       ref={boxWrapper}
       className={cn(
         className,
-        ' relative  rounded-lg p-[2px] bg-[#ffffff15] overflow-hidden'
+        " relative  rounded-lg p-[2px] bg-[#ffffff15] overflow-hidden",
       )}
     >
       {isHovered && (
@@ -134,17 +132,17 @@ export function SpotLightItem({ children, className }: SpotlightItemProps) {
       )}
       {children}
     </div>
-  )
+  );
 }
 
 type SpotlightCardProps = {
-  children: React.ReactNode
-  className?: string
-}
+  children: React.ReactNode;
+  className?: string;
+};
 
 export function SpotlightCard({
   children,
-  className = '',
+  className = "",
 }: SpotlightCardProps) {
   return (
     <div
@@ -152,5 +150,5 @@ export function SpotlightCard({
     >
       {children}
     </div>
-  )
+  );
 }

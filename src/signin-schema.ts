@@ -1,26 +1,21 @@
 import { z } from "zod";
 
-const regex = {
-  password:
-    /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]).{8,}$/,
-};
+const EMAIL_MAX_LENGTH = 254;
+const PASSWORD_MAX_LENGTH = 1024;
+
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 export const SignInSchema = z.object({
-  email: z.string().email({
-    message: "Invalid email address",
-  }),
+  email: z
+    .string()
+    .trim()
+    .max(EMAIL_MAX_LENGTH, "Email address is too long")
+    .email("Invalid email address")
+    .transform(normalizeEmail),
   password: z
     .string()
-    .min(8, {
-      message: "Password must be at least 8 characters long",
-    })
-    .max(12, {
-      message: "Password must be at most 12 characters long",
-    })
-    .regex(regex.password, {
-      message:
-        "Password must contain at least 1 letter, 1 number and 1 special character",
-    }),
+    .min(1, "Password is required")
+    .max(PASSWORD_MAX_LENGTH, "Password is too long"),
 });
 
 export type SignInSchemaType = z.infer<typeof SignInSchema>;

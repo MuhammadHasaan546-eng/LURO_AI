@@ -2,11 +2,11 @@ import "../style/global.css";
 
 import { cn } from "@/functions/cs";
 import { generateMetadata } from "@/functions/metadata";
-import { Toaster } from "sonner";
 import Providers from "@/components/global/providers";
 import { inter, satoshi } from "../constant/font";
 import { Navbar } from "@/components/marketing/Navbar";
 import Footer from "@/components/marketing/Footer";
+import { Toaster } from "@/components/ui/sonner";
 
 export const metadata = generateMetadata();
 
