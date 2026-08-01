@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { SignUpSchema } from "@/signup-schema";
@@ -59,6 +58,7 @@ export async function POST(request: Request) {
       },
       select: { id: true, email: true, firstName: true, lastName: true },
     });
+    if (!user) throw new Error("Failed to create user");
     const verificationToken = await issueAuthToken(
       user.id,
       "VERIFY_EMAIL",
@@ -88,10 +88,7 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    )
+    if (error instanceof Error && /duplicate key|E11000/i.test(error.message))
       return genericDuplicateResponse();
     throw error;
   }

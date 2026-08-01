@@ -1,5 +1,4 @@
 import { createHash, createHmac, randomBytes } from "node:crypto";
-import type { Prisma } from "@prisma/client";
 import { cookies } from "next/headers";
 import argon2 from "argon2";
 import { db } from "@/lib/db";
@@ -59,7 +58,7 @@ export const createSession = async (userId: string, request?: Request) => {
       userId,
       expiresAt,
       idleExpiresAt,
-      userAgent,
+      userAgent: userAgent ?? null,
       ipAddressHash: hashIp(ip),
     },
   });
@@ -72,20 +71,14 @@ export const createSession = async (userId: string, request?: Request) => {
   return { expiresAt, csrfToken };
 };
 
-const sessionWithUser = {
-  user: { include: { identities: true } },
-} satisfies Prisma.SessionInclude;
-
-export type CurrentSession = Prisma.SessionGetPayload<{
-  include: typeof sessionWithUser;
-}>;
+export type CurrentSession = import("@/lib/db").CurrentSession;
 
 export const getCurrentSession = async (): Promise<CurrentSession | null> => {
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   if (!isValidToken(token)) return null;
   const session = await db.session.findUnique({
     where: { tokenHash: hashToken(token!) },
-    include: sessionWithUser,
+    include: true,
   });
   if (
     !session ||
@@ -99,7 +92,7 @@ export const getCurrentSession = async (): Promise<CurrentSession | null> => {
         .catch(() => undefined);
     return null;
   }
-  return session;
+  return session as CurrentSession;
 };
 
 export const requireCsrf = async (

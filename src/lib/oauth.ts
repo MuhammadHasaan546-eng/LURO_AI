@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
-import { OAuthProvider } from "@prisma/client";
+import type { OAuthProvider } from "@/lib/db";
 import { SignJWT, createRemoteJWKSet, jwtVerify } from "jose";
 import { env } from "@/lib/env";
 
 export const oauthProviders = {
-  google: OAuthProvider.GOOGLE,
-  apple: OAuthProvider.APPLE,
-} as const;
+  google: "GOOGLE",
+  apple: "APPLE",
+} as const satisfies Record<string, OAuthProvider>;
 
 export type ProviderName = keyof typeof oauthProviders;
 

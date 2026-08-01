@@ -62,7 +62,7 @@ export async function GET(
       provider: config.provider,
       intent: session ? "link" : "signin",
       returnTo: safeReturnTo(url.searchParams.get("returnTo")),
-      userId: session?.userId,
+      userId: session?.userId ?? null,
       expiresAt: new Date(Date.now() + 10 * 60_000),
     },
   });

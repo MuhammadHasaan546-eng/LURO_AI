@@ -106,6 +106,7 @@ export async function GET(
         },
         select: { id: true },
       });
+      if (!user) throw new Error("Failed to create OAuth user");
       userId = user.id;
     }
     if (current)

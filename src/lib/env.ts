@@ -11,7 +11,8 @@ const schema = z
       .enum(["development", "test", "production"])
       .default("development"),
     APP_URL: z.string().url().default("http://localhost:3000"),
-    DATABASE_URL: z.string().min(1),
+    MONGODB_URI: z.string().url().default("mongodb://127.0.0.1:27017"),
+    MONGODB_DATABASE: z.string().min(1).default("luro-ai"),
     AUTH_SECRET: z.string().min(32).optional(),
     AUTH_EMAIL_PASSWORD_ENABLED: booleanFromEnv,
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),

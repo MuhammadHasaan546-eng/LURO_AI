@@ -7,14 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
-    "prisma:validate": "prisma validate",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",
-    "@prisma/client": "^6.19.0",
+    "mongodb": "^6.16.0",
     "@tailwindcss/postcss": "^4.3.3",
     "argon2": "^0.45.1",
     "bcryptjs": "^3.0.3",
@@ -48,7 +45,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
     "postcss": "^8.5.24",
-    "prisma": "^6.19.0",
     "typescript": "^5",
     "vitest": "^4.1.10"
   }

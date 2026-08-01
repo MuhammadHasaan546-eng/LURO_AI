@@ -7,7 +7,8 @@ Luro owns authentication and persists only hashed bearer/session and one-time to
 Create `.env` locally (never commit it):
 
 ```env
-DATABASE_URL="file:./dev.db"
+MONGODB_URI="mongodb://127.0.0.1:27017"
+MONGODB_DATABASE="luro-ai"
 APP_URL="http://localhost:3000"
 AUTH_SECRET="at-least-32-random-characters"
 AUTH_EMAIL_PASSWORD_ENABLED="true"
@@ -26,20 +27,17 @@ EMAIL_FROM="security@example.com"
 
 Production requires a randomly generated `AUTH_SECRET`, HTTPS `APP_URL`, HTTPS-only cookies, a real email delivery integration, and provider credentials. Missing or partial provider configuration is rejected. Token values are sent only to the configured mailer webhook and are not logged or stored in plaintext.
 
-## Database and local workflow
+## MongoDB and local workflow
 
 ```bash
 npm install
-npm run prisma:validate
-npm run prisma:generate
-npx prisma migrate deploy
 npm run typecheck
 npm run lint
 npm run build
 npm run dev
 ```
 
-The complete authentication migration is `20260801162000_complete_auth`. SQLite is intended for local development; use a production Prisma-supported relational database with backups, encrypted transport, and restricted credentials in deployment.
+MongoDB collections and indexes are created automatically when the application first connects. Use a production MongoDB deployment with backups, encrypted transport, and restricted credentials.
 
 ## Provider-console setup
 
@@ -67,6 +65,6 @@ Configure verified domains for production, including the domain used by `APP_URL
 - Session identifiers rotate after signup, login, OAuth authentication, and password changes. Current/all-session logout revokes database records.
 - State-changing API routes require the CSRF token from the non-HttpOnly CSRF cookie in `x-csrf-token`.
 - Recovery responses are generic, one-time tokens are hashed and expiring, and password changes revoke other sessions.
-- Login, registration, recovery, and OAuth attempts use database-backed rate limits and security audit events.
+- Login, registration, recovery, and OAuth attempts use MongoDB-backed rate limits and security audit events.
 - Account deletion cascades identities, sessions, challenges, and tokens; the final usable sign-in method cannot be removed.
 - Test successful/failed credentials, duplicate and concurrent registration, OAuth cancellation/state/nonce/JWKS failures, callback collisions, CSRF, session rotation/revocation, verification, recovery expiry, linking/unlinking, protected redirects, rate limits, and deletion before production rollout.
