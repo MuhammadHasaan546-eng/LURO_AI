@@ -1,21 +1,19 @@
-import { z } from "zod";
+import Joi from "joi";
 
 const EMAIL_MAX_LENGTH = 254;
 const PASSWORD_MAX_LENGTH = 1024;
 
-const normalizeEmail = (email: string) => email.trim().toLowerCase();
-
-export const SignInSchema = z.object({
-  email: z
-    .string()
+export const SignInSchema = Joi.object({
+  email: Joi.string()
     .trim()
-    .max(EMAIL_MAX_LENGTH, "Email address is too long")
-    .email("Invalid email address")
-    .transform(normalizeEmail),
-  password: z
-    .string()
-    .min(1, "Password is required")
-    .max(PASSWORD_MAX_LENGTH, "Password is too long"),
-});
+    .lowercase()
+    .max(EMAIL_MAX_LENGTH)
+    .email()
+    .required(),
+  password: Joi.string().min(1).max(PASSWORD_MAX_LENGTH).required(),
+}).options({ abortEarly: false, allowUnknown: false, stripUnknown: false });
 
-export type SignInSchemaType = z.infer<typeof SignInSchema>;
+export type SignInSchemaType = {
+  email: string;
+  password: string;
+};

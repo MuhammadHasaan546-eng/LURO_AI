@@ -1,204 +1,54 @@
-import { randomUUID } from "node:crypto";
+import type { ClientSession } from "mongoose";
+import { connectToDatabase, withMongoTransaction } from "@/lib/mongoose";
 import {
-  type Collection,
-  type Db,
-  type Filter,
-  type MongoClient,
-  type OptionalUnlessRequiredId,
-  type UpdateFilter,
-  MongoClient as MongoClientConstructor,
-} from "mongodb";
-import { env } from "@/lib/env";
+  AuditEventModel,
+  AuthTokenModel,
+  OAuthChallengeModel,
+  ProviderIdentityModel,
+  RateLimitBucketModel,
+  SessionModel,
+  UserModel,
+  type AuditEvent,
+  type AuthToken,
+  type OAuthChallenge,
+  type OAuthProvider,
+  type ProviderIdentity,
+  type RateLimitBucket,
+  type Session,
+  type User,
+} from "@/models";
 
-export type OAuthProvider = "GOOGLE" | "APPLE";
-export type TokenPurpose = "VERIFY_EMAIL" | "RESET_PASSWORD";
-export type AuditOutcome = "SUCCESS" | "FAILURE";
-
-type BaseDocument = {
-  _id?: unknown;
-  id: string;
-  createdAt: Date;
-};
-
-export type User = BaseDocument & {
-  email: string;
-  firstName: string;
-  lastName: string;
-  emailVerifiedAt: Date | null;
-  passwordHash: string | null;
-  passwordChangedAt: Date | null;
-  lastAuthenticatedAt: Date | null;
-  updatedAt: Date;
-};
-
-export type ProviderIdentity = BaseDocument & {
-  provider: OAuthProvider;
-  providerSubject: string;
-  providerEmail: string | null;
-  emailVerified: boolean;
-  displayName: string | null;
-  userId: string;
-  updatedAt: Date;
-};
-
-export type Session = BaseDocument & {
-  tokenHash: string;
-  csrfTokenHash: string;
-  userId: string;
-  expiresAt: Date;
-  idleExpiresAt: Date;
-  lastSeenAt: Date;
-  authenticatedAt: Date;
-  revokedAt: Date | null;
-  userAgent: string | null;
-  ipAddressHash: string | null;
-};
-
-export type AuthToken = BaseDocument & {
-  tokenHash: string;
-  purpose: TokenPurpose;
-  userId: string;
-  expiresAt: Date;
-  usedAt: Date | null;
-};
-
-export type OAuthChallenge = BaseDocument & {
-  stateHash: string;
-  nonceHash: string;
-  codeVerifier: string;
-  provider: OAuthProvider;
-  intent: string;
-  returnTo: string;
-  userId: string | null;
-  expiresAt: Date;
-};
-
-type RateLimitBucket = {
-  _id?: unknown;
-  id: string;
-  count: number;
-  windowStart: Date;
-  blockedUntil: Date | null;
-  updatedAt: Date;
-};
-
-type AuditEvent = BaseDocument & {
-  userId: string | null;
-  event: string;
-  outcome: AuditOutcome;
-  ipAddressHash: string | null;
-  userAgent: string | null;
-  metadata: string | null;
-};
+export type {
+  AuditOutcome,
+  OAuthProvider,
+  TokenPurpose,
+  User,
+  ProviderIdentity,
+  Session,
+  AuthToken,
+  OAuthChallenge,
+} from "@/models";
 
 export type CurrentSession = Session & {
   user: User & { identities: ProviderIdentity[] };
 };
 
-type Collections = {
-  users: Collection<User>;
-  providerIdentities: Collection<ProviderIdentity>;
-  sessions: Collection<Session>;
-  authTokens: Collection<AuthToken>;
-  oauthChallenges: Collection<OAuthChallenge>;
-  rateLimitBuckets: Collection<RateLimitBucket>;
-  auditEvents: Collection<AuditEvent>;
+type Selection = Record<string, boolean> | undefined;
+const projection = (select: Selection) =>
+  select
+    ? Object.fromEntries(
+        Object.entries(select).map(([key, enabled]) => [key, enabled ? 1 : 0]),
+      )
+    : undefined;
+const withoutMongoId = <T extends Record<string, unknown>>(value: T | null) => {
+  if (!value) return null;
+  const { _id: _ignored, ...document } = value;
+  return document as Omit<T, "_id">;
 };
-
-const globalForMongo = globalThis as typeof globalThis & {
-  mongoClientPromise?: Promise<MongoClient>;
-  mongoIndexesPromise?: Promise<void>;
-};
-
-const clientPromise =
-  globalForMongo.mongoClientPromise ??
-  new MongoClientConstructor(env.MONGODB_URI).connect();
-
-if (env.NODE_ENV !== "production")
-  globalForMongo.mongoClientPromise = clientPromise;
-
-const database = async (): Promise<Db> =>
-  (await clientPromise).db(env.MONGODB_DATABASE);
-
-const collections = async (): Promise<Collections> => {
-  const mongo = await database();
-  const result: Collections = {
-    users: mongo.collection<User>("users"),
-    providerIdentities:
-      mongo.collection<ProviderIdentity>("providerIdentities"),
-    sessions: mongo.collection<Session>("sessions"),
-    authTokens: mongo.collection<AuthToken>("authTokens"),
-    oauthChallenges: mongo.collection<OAuthChallenge>("oauthChallenges"),
-    rateLimitBuckets: mongo.collection<RateLimitBucket>("rateLimitBuckets"),
-    auditEvents: mongo.collection<AuditEvent>("auditEvents"),
-  };
-
-  globalForMongo.mongoIndexesPromise ??= Promise.all([
-    result.users.createIndex({ email: 1 }, { unique: true }),
-    result.providerIdentities.createIndex(
-      { provider: 1, providerSubject: 1 },
-      { unique: true },
-    ),
-    result.providerIdentities.createIndex({ userId: 1 }),
-    result.sessions.createIndex({ tokenHash: 1 }, { unique: true }),
-    result.sessions.createIndex({ userId: 1, revokedAt: 1 }),
-    result.authTokens.createIndex({ tokenHash: 1 }, { unique: true }),
-    result.authTokens.createIndex({ userId: 1, purpose: 1 }),
-    result.oauthChallenges.createIndex({ stateHash: 1 }, { unique: true }),
-    result.oauthChallenges.createIndex(
-      { expiresAt: 1 },
-      { expireAfterSeconds: 0 },
-    ),
-    result.rateLimitBuckets.createIndex(
-      { updatedAt: 1 },
-      { expireAfterSeconds: 86400 },
-    ),
-    result.auditEvents.createIndex({ userId: 1, createdAt: -1 }),
-  ]).then(() => undefined);
-  await globalForMongo.mongoIndexesPromise;
-  return result;
-};
-
-const clean = <T extends { _id?: unknown }>(document: T | null) => {
-  if (!document) return null;
-  const { _id: _ignored, ...value } = document;
-  return value as Omit<T, "_id">;
-};
-
-const insert = async <T extends BaseDocument>(
-  collection: Collection<T>,
-  data: Omit<OptionalUnlessRequiredId<T>, "_id">,
-) => {
-  await collection.insertOne(data as OptionalUnlessRequiredId<T>);
-  return clean(data as unknown as T)!;
-};
-
-const selectFields = <T extends object>(
-  value: T | null,
-  select?: Record<string, boolean>,
-) => {
-  if (!value || !select) return value;
-  return Object.fromEntries(
-    Object.keys(select)
-      .filter((key) => select[key])
-      .map((key) => [key, value[key as keyof T]]),
-  ) as Pick<T, keyof T>;
-};
-
-const nowDocument = () => ({ id: randomUUID(), createdAt: new Date() });
-
-export const mongo = {
-  users: async () => (await collections()).users,
-  providerIdentities: async () => (await collections()).providerIdentities,
-  sessions: async () => (await collections()).sessions,
-  authTokens: async () => (await collections()).authTokens,
-  oauthChallenges: async () => (await collections()).oauthChallenges,
-  rateLimitBuckets: async () => (await collections()).rateLimitBuckets,
-  auditEvents: async () => (await collections()).auditEvents,
-  clean,
-  insert,
-  nowDocument,
-};
+const leanOne = async <T>(query: { lean: () => Promise<T | null> }) =>
+  withoutMongoId(
+    (await query.lean()) as Record<string, unknown> | null,
+  ) as T | null;
 
 export const db = {
   user: {
@@ -207,51 +57,62 @@ export const db = {
       select,
     }: {
       where: { id?: string; email?: string };
-      select?: Record<string, boolean>;
-    }) =>
-      selectFields(
-        clean(await (await mongo.users()).findOne(where as Filter<User>)),
-        select,
-      ),
+      select?: Selection;
+    }) => {
+      await connectToDatabase();
+      const query = UserModel.findOne(where, projection(select));
+      if (select?.passwordHash) query.select("+passwordHash");
+      return leanOne(query);
+    },
     create: async ({
       data,
       select,
     }: {
-      data: Partial<User> & Pick<User, "email"> & { identities?: unknown };
-      select?: Record<string, boolean>;
-    }) => {
-      const timestamp = new Date();
-      const identityData = (
-        data as typeof data & {
+      data: Partial<User> &
+        Pick<User, "email"> & {
           identities?: {
             create: Omit<
               ProviderIdentity,
-              keyof BaseDocument | "userId" | "updatedAt"
+              "id" | "userId" | "createdAt" | "updatedAt"
             >;
           };
+        };
+      select?: Selection;
+    }) => {
+      await connectToDatabase();
+      const { identities, ...userData } = data;
+      const create = async (session?: ClientSession) => {
+        const [user] = await UserModel.create(
+          [
+            {
+              firstName: "",
+              lastName: "",
+              emailVerifiedAt: null,
+              passwordHash: null,
+              passwordChangedAt: null,
+              lastAuthenticatedAt: null,
+              ...userData,
+            },
+          ],
+          { session },
+        );
+        if (identities) {
+          await ProviderIdentityModel.create(
+            [{ ...identities.create, userId: user.id }],
+            { session },
+          );
         }
-      ).identities;
-      const user = await insert(await mongo.users(), {
-        ...nowDocument(),
-        firstName: "",
-        lastName: "",
-        emailVerifiedAt: null,
-        passwordHash: null,
-        passwordChangedAt: null,
-        lastAuthenticatedAt: null,
-        ...data,
-        identities: undefined,
-        updatedAt: timestamp,
-      } as unknown as User);
-      if (identityData) {
-        await insert(await mongo.providerIdentities(), {
-          ...nowDocument(),
-          ...identityData.create,
-          userId: user.id,
-          updatedAt: timestamp,
-        } as ProviderIdentity);
-      }
-      return selectFields(user, select);
+        const value = user.toObject() as Record<string, unknown>;
+        const clean = withoutMongoId(value)!;
+        return select
+          ? Object.fromEntries(
+              Object.keys(select)
+                .filter((key) => select[key])
+                .map((key) => [key, clean[key]]),
+            )
+          : clean;
+      };
+      return identities ? withMongoTransaction(create) : create();
     },
     update: async ({
       where,
@@ -259,31 +120,34 @@ export const db = {
     }: {
       where: { id: string };
       data: Partial<User>;
-    }) =>
-      clean(
-        await (
-          await mongo.users()
-        ).findOneAndUpdate(
+    }) => {
+      await connectToDatabase();
+      return leanOne(
+        UserModel.findOneAndUpdate(
           where,
-          { $set: { ...data, updatedAt: new Date() } },
-          { returnDocument: "after" },
+          { $set: data },
+          { new: true, runValidators: true },
         ),
-      ),
-    delete: async ({ where }: { where: { id: string } }) => {
-      const stores = await collections();
-      const user = clean(await stores.users.findOneAndDelete(where));
-      await Promise.all([
-        stores.providerIdentities.deleteMany({ userId: where.id }),
-        stores.sessions.deleteMany({ userId: where.id }),
-        stores.authTokens.deleteMany({ userId: where.id }),
-        stores.oauthChallenges.deleteMany({ userId: where.id }),
-        stores.auditEvents.updateMany(
-          { userId: where.id },
-          { $set: { userId: null } },
-        ),
-      ]);
-      return user;
+      );
     },
+    delete: async ({ where }: { where: { id: string } }) =>
+      withMongoTransaction(async (session) => {
+        const user = await leanOne(
+          UserModel.findOneAndDelete(where, { session }),
+        );
+        await Promise.all([
+          ProviderIdentityModel.deleteMany({ userId: where.id }, { session }),
+          SessionModel.deleteMany({ userId: where.id }, { session }),
+          AuthTokenModel.deleteMany({ userId: where.id }, { session }),
+          OAuthChallengeModel.deleteMany({ userId: where.id }, { session }),
+          AuditEventModel.updateMany(
+            { userId: where.id },
+            { $set: { userId: null } },
+            { session },
+          ),
+        ]);
+        return user;
+      }),
   },
   providerIdentity: {
     findUnique: async ({
@@ -295,29 +159,23 @@ export const db = {
           providerSubject: string;
         };
       };
-    }) =>
-      clean(
-        await (
-          await mongo.providerIdentities()
-        ).findOne(where.provider_providerSubject),
-      ),
-    findFirst: async ({ where }: { where: Partial<ProviderIdentity> }) =>
-      clean(
-        await (
-          await mongo.providerIdentities()
-        ).findOne(where as Filter<ProviderIdentity>),
-      ),
+    }) => {
+      await connectToDatabase();
+      return leanOne(
+        ProviderIdentityModel.findOne(where.provider_providerSubject),
+      );
+    },
+    findFirst: async ({ where }: { where: Partial<ProviderIdentity> }) => {
+      await connectToDatabase();
+      return leanOne(ProviderIdentityModel.findOne(where));
+    },
     create: async (
-      data: Omit<ProviderIdentity, keyof BaseDocument | "updatedAt">,
-    ) =>
-      insert(await mongo.providerIdentities(), {
-        ...nowDocument(),
-        ...data,
-        providerEmail: data.providerEmail ?? null,
-        emailVerified: data.emailVerified ?? false,
-        displayName: data.displayName ?? null,
-        updatedAt: new Date(),
-      } as ProviderIdentity),
+      data: Omit<ProviderIdentity, "id" | "createdAt" | "updatedAt">,
+    ) => {
+      await connectToDatabase();
+      const value = await ProviderIdentityModel.create(data);
+      return withoutMongoId(value.toObject() as Record<string, unknown>);
+    },
     upsert: async ({
       where,
       create,
@@ -329,25 +187,22 @@ export const db = {
           providerSubject: string;
         };
       };
-      create: Omit<ProviderIdentity, keyof BaseDocument | "updatedAt">;
+      create: Omit<ProviderIdentity, "id" | "createdAt" | "updatedAt">;
       update: Partial<ProviderIdentity>;
     }) => {
-      const timestamp = new Date();
-      return clean(
-        await (
-          await mongo.providerIdentities()
-        ).findOneAndUpdate(
+      await connectToDatabase();
+      return leanOne(
+        ProviderIdentityModel.findOneAndUpdate(
           where.provider_providerSubject,
-          {
-            $set: { ...update, updatedAt: timestamp },
-            $setOnInsert: { ...nowDocument(), ...create },
-          },
-          { upsert: true, returnDocument: "after" },
+          { $set: update, $setOnInsert: create },
+          { upsert: true, new: true, runValidators: true },
         ),
       );
     },
-    delete: async ({ where }: { where: { id: string } }) =>
-      clean(await (await mongo.providerIdentities()).findOneAndDelete(where)),
+    delete: async ({ where }: { where: { id: string } }) => {
+      await connectToDatabase();
+      return leanOne(ProviderIdentityModel.findOneAndDelete(where));
+    },
   },
   session: {
     create: async ({
@@ -355,19 +210,23 @@ export const db = {
     }: {
       data: Omit<
         Session,
-        keyof BaseDocument | "lastSeenAt" | "authenticatedAt" | "revokedAt"
+        | "id"
+        | "createdAt"
+        | "updatedAt"
+        | "lastSeenAt"
+        | "authenticatedAt"
+        | "revokedAt"
       >;
     }) => {
-      const timestamp = new Date();
-      return insert(await mongo.sessions(), {
-        ...nowDocument(),
+      await connectToDatabase();
+      const now = new Date();
+      const value = await SessionModel.create({
         ...data,
-        userAgent: data.userAgent ?? null,
-        ipAddressHash: data.ipAddressHash ?? null,
-        lastSeenAt: timestamp,
-        authenticatedAt: timestamp,
+        lastSeenAt: now,
+        authenticatedAt: now,
         revokedAt: null,
-      } as Session);
+      });
+      return withoutMongoId(value.toObject() as Record<string, unknown>);
     },
     findUnique: async ({
       where,
@@ -376,17 +235,20 @@ export const db = {
       where: { tokenHash: string };
       include?: unknown;
     }) => {
-      const session = clean(await (await mongo.sessions()).findOne(where));
+      await connectToDatabase();
+      const session = await leanOne<Session>(
+        SessionModel.findOne(where).select("+tokenHash +csrfTokenHash"),
+      );
       if (!session || !include) return session;
-      const user = clean(
-        await (await mongo.users()).findOne({ id: session.userId }),
+      const user = await leanOne<User>(
+        UserModel.findOne({ id: session.userId }).select("+passwordHash"),
       );
       if (!user) return null;
       const identities = (
-        await (await mongo.providerIdentities())
-          .find({ userId: user.id })
-          .toArray()
-      ).map(clean);
+        await ProviderIdentityModel.find({ userId: user.id }).lean()
+      ).map(
+        (item) => withoutMongoId(item as unknown as Record<string, unknown>)!,
+      ) as ProviderIdentity[];
       return { ...session, user: { ...user, identities } } as CurrentSession;
     },
     findMany: async ({
@@ -394,35 +256,40 @@ export const db = {
       select,
     }: {
       where: { userId: string; revokedAt: null; expiresAt: { gt: Date } };
-      select?: Record<string, boolean>;
+      select?: Selection;
       orderBy?: Record<string, "asc" | "desc">;
-    }) =>
-      (
-        await (
-          await mongo.sessions()
-        )
-          .find({
-            userId: where.userId,
-            revokedAt: null,
-            expiresAt: { $gt: where.expiresAt.gt },
-          })
-          .sort({ createdAt: -1 })
-          .toArray()
+    }) => {
+      await connectToDatabase();
+      const values = await SessionModel.find(
+        {
+          userId: where.userId,
+          revokedAt: null,
+          expiresAt: { $gt: where.expiresAt.gt },
+        },
+        projection(select),
       )
-        .map((item) => selectFields(clean(item), select))
-        .filter((item): item is NonNullable<typeof item> => Boolean(item)),
+        .sort({ createdAt: -1 })
+        .lean();
+      return values.map(
+        (item) => withoutMongoId(item as unknown as Record<string, unknown>)!,
+      );
+    },
     update: async ({
       where,
       data,
     }: {
       where: { id: string };
       data: Partial<Session>;
-    }) =>
-      clean(
-        await (
-          await mongo.sessions()
-        ).findOneAndUpdate(where, { $set: data }, { returnDocument: "after" }),
-      ),
+    }) => {
+      await connectToDatabase();
+      return leanOne(
+        SessionModel.findOneAndUpdate(
+          where,
+          { $set: data },
+          { new: true, runValidators: true },
+        ),
+      );
+    },
     updateMany: async ({
       where,
       data,
@@ -430,17 +297,19 @@ export const db = {
       where: Record<string, unknown>;
       data: Partial<Session>;
     }) => {
-      const filter: Record<string, unknown> = { ...where };
+      await connectToDatabase();
+      const filter = { ...where };
       if (
         where.id &&
         typeof where.id === "object" &&
-        where.id !== null &&
-        "not" in where.id
+        "not" in (where.id as object)
       )
         filter.id = { $ne: (where.id as { not: string }).not };
-      const result = await (
-        await mongo.sessions()
-      ).updateMany(filter, { $set: data } as UpdateFilter<Session>);
+      const result = await SessionModel.updateMany(
+        filter,
+        { $set: data },
+        { runValidators: true },
+      );
       return { count: result.modifiedCount };
     },
   },
@@ -448,15 +317,18 @@ export const db = {
     create: async ({
       data,
     }: {
-      data: Omit<AuthToken, keyof BaseDocument | "usedAt">;
-    }) =>
-      insert(await mongo.authTokens(), {
-        ...nowDocument(),
-        ...data,
-        usedAt: null,
-      } as AuthToken),
-    findUnique: async ({ where }: { where: { tokenHash: string } }) =>
-      clean(await (await mongo.authTokens()).findOne(where)),
+      data: Omit<AuthToken, "id" | "createdAt" | "updatedAt" | "usedAt">;
+    }) => {
+      await connectToDatabase();
+      const value = await AuthTokenModel.create({ ...data, usedAt: null });
+      return withoutMongoId(value.toObject() as Record<string, unknown>);
+    },
+    findUnique: async ({ where }: { where: { tokenHash: string } }) => {
+      await connectToDatabase();
+      return leanOne<AuthToken>(
+        AuthTokenModel.findOne(where).select("+tokenHash"),
+      );
+    },
     updateMany: async ({
       where,
       data,
@@ -464,9 +336,12 @@ export const db = {
       where: Partial<AuthToken>;
       data: Partial<AuthToken>;
     }) => {
-      const result = await (
-        await mongo.authTokens()
-      ).updateMany(where as Filter<AuthToken>, { $set: data });
+      await connectToDatabase();
+      const result = await AuthTokenModel.updateMany(
+        where,
+        { $set: data },
+        { runValidators: true },
+      );
       return { count: result.modifiedCount };
     },
   },
@@ -474,53 +349,64 @@ export const db = {
     create: async ({
       data,
     }: {
-      data: Omit<OAuthChallenge, keyof BaseDocument>;
-    }) =>
-      insert(await mongo.oauthChallenges(), {
-        ...nowDocument(),
-        ...data,
-        userId: data.userId ?? null,
-      } as OAuthChallenge),
-    findUnique: async ({ where }: { where: { stateHash: string } }) =>
-      clean(await (await mongo.oauthChallenges()).findOne(where)),
-    delete: async ({ where }: { where: { id: string } }) =>
-      clean(await (await mongo.oauthChallenges()).findOneAndDelete(where)),
+      data: Omit<OAuthChallenge, "id" | "createdAt" | "updatedAt">;
+    }) => {
+      await connectToDatabase();
+      const value = await OAuthChallengeModel.create(data);
+      return withoutMongoId(value.toObject() as Record<string, unknown>);
+    },
+    findUnique: async ({ where }: { where: { stateHash: string } }) => {
+      await connectToDatabase();
+      return leanOne<OAuthChallenge>(
+        OAuthChallengeModel.findOne(where).select(
+          "+stateHash +nonceHash +codeVerifier",
+        ),
+      );
+    },
+    delete: async ({ where }: { where: { id: string } }) => {
+      await connectToDatabase();
+      return leanOne(OAuthChallengeModel.findOneAndDelete(where));
+    },
   },
   rateLimitBucket: {
-    findUnique: async ({ where }: { where: { id: string } }) =>
-      clean(await (await mongo.rateLimitBuckets()).findOne(where)),
+    findUnique: async ({ where }: { where: { id: string } }) => {
+      await connectToDatabase();
+      return leanOne<RateLimitBucket>(RateLimitBucketModel.findOne(where));
+    },
     upsert: async ({
       where,
       create,
       update,
     }: {
       where: { id: string };
-      create: Omit<RateLimitBucket, "_id" | "updatedAt">;
+      create: Omit<RateLimitBucket, "createdAt" | "updatedAt">;
       update: Partial<RateLimitBucket>;
-    }) =>
-      clean(
-        await (
-          await mongo.rateLimitBuckets()
-        ).findOneAndUpdate(
+    }) => {
+      await connectToDatabase();
+      return leanOne(
+        RateLimitBucketModel.findOneAndUpdate(
           where,
-          { $set: { ...update, updatedAt: new Date() }, $setOnInsert: create },
-          { upsert: true, returnDocument: "after" },
+          { $set: update, $setOnInsert: create },
+          { upsert: true, new: true, runValidators: true },
         ),
-      ),
+      );
+    },
   },
   auditEvent: {
     create: async ({
       data,
     }: {
       data: Pick<AuditEvent, "event" | "outcome"> & Partial<AuditEvent>;
-    }) =>
-      insert(await mongo.auditEvents(), {
-        ...nowDocument(),
+    }) => {
+      await connectToDatabase();
+      const value = await AuditEventModel.create({
         userId: null,
         ipAddressHash: null,
         userAgent: null,
         metadata: null,
         ...data,
-      } as AuditEvent),
+      });
+      return withoutMongoId(value.toObject() as Record<string, unknown>);
+    },
   },
 };
