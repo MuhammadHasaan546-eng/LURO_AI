@@ -1,37 +1,41 @@
 import { NextResponse } from "next/server";
+import Joi from "joi";
 import { hashPassword, requireCsrf, verifyPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { z } from "zod";
-const schema = z
-  .object({
-    currentPassword: z.string().max(1024).optional(),
-    password: z.string().min(12).max(1024),
-    confirmPassword: z.string(),
-  })
-  .refine((v) => v.password === v.confirmPassword, {
-    path: ["confirmPassword"],
-    message: "Passwords do not match",
-  });
+
+const schema = Joi.object({
+  currentPassword: Joi.string().max(1024).allow(""),
+  password: Joi.string().min(12).max(1024).required(),
+  confirmPassword: Joi.any().valid(Joi.ref("password")).required(),
+}).options({ abortEarly: false, allowUnknown: false });
 export async function POST(request: Request) {
   const session = await requireCsrf(request);
   if (!session)
     return NextResponse.json({ message: "Invalid request." }, { status: 403 });
-  const parsed = schema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success)
+  const { value, error } = schema.validate(
+    await request.json().catch(() => null),
+    {
+      abortEarly: false,
+      allowUnknown: false,
+    },
+  );
+  if (error)
     return NextResponse.json(
       {
         message: "Please check the form.",
-        fieldErrors: parsed.error.flatten().fieldErrors,
+        fieldErrors: Object.fromEntries(
+          error.details.map((detail) => [
+            detail.path.join("."),
+            [detail.message],
+          ]),
+        ),
       },
       { status: 400 },
     );
   if (
     session.user.passwordHash &&
-    (!parsed.data.currentPassword ||
-      !(await verifyPassword(
-        parsed.data.currentPassword,
-        session.user.passwordHash,
-      )))
+    (!value.currentPassword ||
+      !(await verifyPassword(value.currentPassword, session.user.passwordHash)))
   )
     return NextResponse.json(
       { message: "Current password is incorrect." },
@@ -40,7 +44,7 @@ export async function POST(request: Request) {
   await db.user.update({
     where: { id: session.userId },
     data: {
-      passwordHash: await hashPassword(parsed.data.password),
+      passwordHash: await hashPassword(value.password),
       passwordChangedAt: new Date(),
       lastAuthenticatedAt: new Date(),
     },

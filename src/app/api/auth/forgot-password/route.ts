@@ -1,28 +1,23 @@
 import { NextResponse } from "next/server";
+import Joi from "joi";
 import { audit, issueAuthToken } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { z } from "zod";
 
-const schema = z.object({
-  email: z
-    .string()
-    .trim()
-    .email()
-    .max(254)
-    .transform((v) => v.toLowerCase()),
-});
+const schema = Joi.object({
+  email: Joi.string().trim().lowercase().email().max(254).required(),
+}).options({ allowUnknown: false });
 export async function POST(request: Request) {
   const limit = await checkRateLimit(request, "recovery");
   if (!limit.allowed)
     return NextResponse.json({
       message: "If an account exists, reset instructions will be sent shortly.",
     });
-  const parsed = schema.safeParse(await request.json().catch(() => null));
-  if (parsed.success) {
+  const parsed = schema.validate(await request.json().catch(() => null));
+  if (!parsed.error) {
     const user = await db.user.findUnique({
-      where: { email: parsed.data.email },
+      where: { email: parsed.value.email },
     });
     if (user) {
       await db.authToken.updateMany({

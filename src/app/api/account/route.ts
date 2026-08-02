@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentSession, requireCsrf } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { accountNameSchema } from "@/lib/validation";
 
 export async function GET() {
   const session = await getCurrentSession();
@@ -46,20 +47,20 @@ export async function PATCH(request: Request) {
   const session = await requireCsrf(request);
   if (!session)
     return NextResponse.json({ message: "Invalid request." }, { status: 403 });
-  const body = (await request.json().catch(() => null)) as {
-    firstName?: string;
-    lastName?: string;
-  } | null;
-  const firstName = body?.firstName?.trim().slice(0, 100);
-  const lastName = body?.lastName?.trim().slice(0, 100);
-  if (!firstName || !lastName)
+  const parsed = accountNameSchema.validate(
+    await request.json().catch(() => null),
+  );
+  if (parsed.error)
     return NextResponse.json(
       { message: "First and last name are required." },
       { status: 400 },
     );
   await db.user.update({
     where: { id: session.userId },
-    data: { firstName, lastName },
+    data: {
+      firstName: parsed.value.firstName,
+      lastName: parsed.value.lastName,
+    },
   });
   return NextResponse.json({ message: "Account updated." });
 }

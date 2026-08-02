@@ -14,9 +14,18 @@ const invalid = () =>
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  const validation = SignInSchema.safeParse(body);
-  if (!validation.success) {
-    const { fieldErrors, formErrors } = validation.error.flatten();
+  const validation = SignInSchema.validate(body, {
+    abortEarly: false,
+    allowUnknown: false,
+  });
+  if (validation.error) {
+    const fieldErrors: Record<string, string[]> = {};
+    const formErrors: string[] = [];
+    for (const detail of validation.error.details) {
+      if (detail.path.length)
+        (fieldErrors[detail.path.join(".")] ??= []).push(detail.message);
+      else formErrors.push(detail.message);
+    }
     return NextResponse.json(
       {
         message: "Please correct the highlighted fields.",
@@ -26,7 +35,10 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const { email, password } = validation.data;
+  const { email, password } = validation.value as {
+    email: string;
+    password: string;
+  };
   const limit = await checkRateLimit(request, "signin", email);
   if (!limit.allowed)
     return NextResponse.json(

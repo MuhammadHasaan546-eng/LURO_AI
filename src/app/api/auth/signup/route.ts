@@ -24,9 +24,18 @@ const parseBody = async (request: Request) => {
 
 export async function POST(request: Request) {
   const body = await parseBody(request);
-  const validation = SignUpSchema.safeParse(body);
-  if (!validation.success) {
-    const { fieldErrors, formErrors } = validation.error.flatten();
+  const validation = SignUpSchema.validate(body, {
+    abortEarly: false,
+    allowUnknown: false,
+  });
+  if (validation.error) {
+    const fieldErrors: Record<string, string[]> = {};
+    const formErrors: string[] = [];
+    for (const detail of validation.error.details) {
+      if (detail.path.length)
+        (fieldErrors[detail.path.join(".")] ??= []).push(detail.message);
+      else formErrors.push(detail.message);
+    }
     return NextResponse.json(
       {
         message: "Please correct the highlighted fields.",
@@ -37,7 +46,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const { firstName, lastName, email, password } = validation.data;
+  const { firstName, lastName, email, password } = validation.value as {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+  };
   const existingUser = await db.user.findUnique({
     where: { email },
     select: { id: true },

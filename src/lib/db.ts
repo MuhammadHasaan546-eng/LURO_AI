@@ -58,11 +58,11 @@ export const db = {
     }: {
       where: { id?: string; email?: string };
       select?: Selection;
-    }) => {
+    }): Promise<User | null> => {
       await connectToDatabase();
       const query = UserModel.findOne(where, projection(select));
       if (select?.passwordHash) query.select("+passwordHash");
-      return leanOne(query);
+      return leanOne<User>(query);
     },
     create: async ({
       data,
@@ -104,13 +104,15 @@ export const db = {
         }
         const value = user.toObject() as Record<string, unknown>;
         const clean = withoutMongoId(value)!;
-        return select
-          ? Object.fromEntries(
-              Object.keys(select)
-                .filter((key) => select[key])
-                .map((key) => [key, clean[key]]),
-            )
-          : clean;
+        return (
+          select
+            ? Object.fromEntries(
+                Object.keys(select)
+                  .filter((key) => select[key])
+                  .map((key) => [key, clean[key]]),
+              )
+            : clean
+        ) as User;
       };
       return identities ? withMongoTransaction(create) : create();
     },
@@ -122,7 +124,7 @@ export const db = {
       data: Partial<User>;
     }) => {
       await connectToDatabase();
-      return leanOne(
+      return leanOne<User>(
         UserModel.findOneAndUpdate(
           where,
           { $set: data },
@@ -132,7 +134,7 @@ export const db = {
     },
     delete: async ({ where }: { where: { id: string } }) =>
       withMongoTransaction(async (session) => {
-        const user = await leanOne(
+        const user = await leanOne<User>(
           UserModel.findOneAndDelete(where, { session }),
         );
         await Promise.all([
@@ -161,13 +163,13 @@ export const db = {
       };
     }) => {
       await connectToDatabase();
-      return leanOne(
+      return leanOne<ProviderIdentity>(
         ProviderIdentityModel.findOne(where.provider_providerSubject),
       );
     },
     findFirst: async ({ where }: { where: Partial<ProviderIdentity> }) => {
       await connectToDatabase();
-      return leanOne(ProviderIdentityModel.findOne(where));
+      return leanOne<ProviderIdentity>(ProviderIdentityModel.findOne(where));
     },
     create: async (
       data: Omit<ProviderIdentity, "id" | "createdAt" | "updatedAt">,
@@ -191,7 +193,7 @@ export const db = {
       update: Partial<ProviderIdentity>;
     }) => {
       await connectToDatabase();
-      return leanOne(
+      return leanOne<ProviderIdentity>(
         ProviderIdentityModel.findOneAndUpdate(
           where.provider_providerSubject,
           { $set: update, $setOnInsert: create },
@@ -201,7 +203,9 @@ export const db = {
     },
     delete: async ({ where }: { where: { id: string } }) => {
       await connectToDatabase();
-      return leanOne(ProviderIdentityModel.findOneAndDelete(where));
+      return leanOne<ProviderIdentity>(
+        ProviderIdentityModel.findOneAndDelete(where),
+      );
     },
   },
   session: {
@@ -282,7 +286,7 @@ export const db = {
       data: Partial<Session>;
     }) => {
       await connectToDatabase();
-      return leanOne(
+      return leanOne<Session>(
         SessionModel.findOneAndUpdate(
           where,
           { $set: data },
@@ -365,7 +369,9 @@ export const db = {
     },
     delete: async ({ where }: { where: { id: string } }) => {
       await connectToDatabase();
-      return leanOne(OAuthChallengeModel.findOneAndDelete(where));
+      return leanOne<OAuthChallenge>(
+        OAuthChallengeModel.findOneAndDelete(where),
+      );
     },
   },
   rateLimitBucket: {
