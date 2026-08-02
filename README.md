@@ -4,11 +4,14 @@ Luro owns authentication and persists only hashed bearer/session and one-time to
 
 ## Environment
 
-Create `.env` locally (never commit it):
+Copy [`.env.example`](.env.example) to `.env` locally (never commit `.env`):
 
 ```env
 MONGODB_URI="mongodb://127.0.0.1:27017"
 MONGODB_DATABASE="luro-ai"
+MONGODB_MAX_POOL_SIZE="10"
+MONGODB_MIN_POOL_SIZE="0"
+MONGODB_SERVER_SELECTION_TIMEOUT_MS="10000"
 APP_URL="http://localhost:3000"
 AUTH_SECRET="at-least-32-random-characters"
 AUTH_EMAIL_PASSWORD_ENABLED="true"
@@ -37,7 +40,13 @@ npm run build
 npm run dev
 ```
 
-MongoDB collections and indexes are created automatically when the application first connects. Use a production MongoDB deployment with backups, encrypted transport, and restricted credentials.
+MongoDB collections and Mongoose indexes are created automatically when the application first connects. The connection uses bounded pooling, startup validation, redacted connection failures, cached serverless connections, and graceful process shutdown. Use a replica set or sharded cluster in production because account deletion and OAuth account creation use transactions. Use backups, encrypted transport, and least-privilege credentials.
+
+All backend bodies, route parameters, query values, identifiers, and configuration values are validated with Joi. Unknown body fields are rejected, Mongoose strict query handling and filter sanitization are enabled, and database filters are constructed exclusively from validated scalar values.
+
+## Data migration
+
+No legacy database schema, migration, seed, fixture, source connection configuration, or legacy data file is present in this repository, so there is no source dataset that can be migrated safely from application code. Before deploying over an environment that has data in another system, export and retain an encrypted backup, implement a source-specific one-time importer outside the application runtime, verify per-collection counts and uniqueness constraints in a staging replica set, and only then switch traffic. Do not delete the source backup until the retention and rollback window has elapsed. The application runtime and manifest intentionally contain MongoDB/Mongoose only.
 
 ## Provider-console setup
 

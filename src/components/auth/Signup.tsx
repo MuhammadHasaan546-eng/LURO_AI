@@ -48,7 +48,7 @@ export const SignUpPage = () => {
           lastName,
           email,
           password,
-          passwordConfirmation,
+          confirmPassword: passwordConfirmation,
         }),
       });
 

@@ -42,7 +42,8 @@ const projection = (select: Selection) =>
     : undefined;
 const withoutMongoId = <T extends Record<string, unknown>>(value: T | null) => {
   if (!value) return null;
-  const { _id: _ignored, ...document } = value;
+  const document = { ...value };
+  delete document._id;
   return document as Omit<T, "_id">;
 };
 const leanOne = async <T>(query: { lean: () => Promise<T | null> }) =>

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { consumeAuthToken } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { tokenSchema } from "@/lib/validation";
 export async function POST(request: Request) {
-  const token = (
-    (await request.json().catch(() => null)) as { token?: string } | null
-  )?.token;
-  const userId = token ? await consumeAuthToken(token, "VERIFY_EMAIL") : null;
+  const parsed = tokenSchema.validate(await request.json().catch(() => null));
+  const userId = parsed.error
+    ? null
+    : await consumeAuthToken(parsed.value.token, "VERIFY_EMAIL");
   if (!userId)
     return NextResponse.json(
       { message: "This verification link is invalid or expired." },

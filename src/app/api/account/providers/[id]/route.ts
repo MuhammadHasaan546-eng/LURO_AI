@@ -9,6 +9,11 @@ export async function DELETE(
   if (!session)
     return NextResponse.json({ message: "Invalid request." }, { status: 403 });
   const { id } = await context.params;
+  if (!/^[0-9a-f]{24}$/i.test(id) && !/^[0-9a-f-]{36}$/i.test(id))
+    return NextResponse.json(
+      { message: "Sign-in method not found." },
+      { status: 404 },
+    );
   const identity = await db.providerIdentity.findFirst({
     where: { id, userId: session.userId },
   });

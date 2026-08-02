@@ -9,6 +9,11 @@ export async function DELETE(
   if (!session)
     return NextResponse.json({ message: "Invalid request." }, { status: 403 });
   const { id } = await context.params;
+  if (!/^[0-9a-f]{24}$/i.test(id) && !/^[0-9a-f-]{36}$/i.test(id))
+    return NextResponse.json(
+      { message: "Session not found." },
+      { status: 404 },
+    );
   if (id === session.id)
     return NextResponse.json(
       { message: "Use sign out to revoke the current session." },

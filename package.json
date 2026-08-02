@@ -10,7 +10,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.5.7",
     "@tailwindcss/postcss": "^4.3.3",
     "argon2": "^0.45.1",
     "class-variance-authority": "^0.7.1",
