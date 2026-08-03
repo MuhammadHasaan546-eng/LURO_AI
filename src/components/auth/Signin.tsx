@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { clearAuthRequest, signIn } from "@/store/authSlice";
+import { clearAuthRequest, signIn } from "@/store/auth/slice/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store";
 
 const inputClassName =

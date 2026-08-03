@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import AuthShell from "@/components/auth/AuthShell";
-import { verifyEmail } from "@/store/authSlice";
+import { verifyEmail } from "@/store/auth/slice/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store";
 
 export default function VerifyEmailPage() {

@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
-import { clearAuthRequest, signUp } from "@/store/authSlice";
+import { clearAuthRequest, signUp } from "@/store/auth/slice/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store";
 
 const inputClassName =

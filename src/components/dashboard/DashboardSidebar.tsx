@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LogOut, SearchIcon } from "lucide-react";
 import { toast } from "sonner";
 
-import { logout } from "@/store/authSlice";
+import { logout } from "@/store/auth/slice/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store";
 
 import {

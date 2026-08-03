@@ -1,34 +1,24 @@
-import {
-  createAsyncThunk,
-  createSlice,
-  type PayloadAction,
-} from "@reduxjs/toolkit";
+import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
-import { apiRequest, getApiError, type ApiError } from "@/store/api";
+import { type ApiError } from "@/store/api/index";
+import {
+  forgotPassword,
+  logout,
+  resendVerification,
+  resetPassword,
+  signIn,
+  signUp,
+  verifyEmail,
+} from "@/store/auth/api/authThunk";
 
 export type RequestStatus = "idle" | "loading" | "succeeded" | "failed";
 
 type AuthResponse = ApiError & { message?: string };
-type SigninResponse = AuthResponse & {
-  code?: "ALREADY_AUTHENTICATED";
-  redirectTo?: string;
-};
-type Credentials = { email: string; password: string };
-type SignupPayload = Credentials & {
-  firstName: string;
-  lastName: string;
-  confirmPassword: string;
-};
-type ResetPasswordPayload = {
-  token: string | null;
-  password: FormDataEntryValue | null;
-  confirmPassword: FormDataEntryValue | null;
-};
 
 type AuthState = {
   status: RequestStatus;
   operation: string | null;
-  data: AuthResponse | SigninResponse | null;
+  data: AuthResponse | null;
   error: string | null;
   fieldErrors: Record<string, string[]>;
   formErrors: string[];
@@ -46,56 +36,6 @@ const initialState: AuthState = {
   currentRequestId: null,
   lastCompletedAt: null,
 };
-
-const rejectApiError = (error: unknown, fallback: string) => {
-  const apiError = (
-    typeof error === "object" && error ? error : {}
-  ) as ApiError;
-  return {
-    ...apiError,
-    message: getApiError(error, fallback),
-  };
-};
-
-const rejectSignInError = (error: unknown) => {
-  const apiError = rejectApiError(
-    error,
-    "Unable to sign in. Please try again.",
-  );
-  return {
-    ...apiError,
-    message:
-      apiError.status === 401 || apiError.code === "INVALID_CREDENTIALS"
-        ? "Incorrect username or password"
-        : apiError.message,
-    formErrors:
-      apiError.status === 401 || apiError.code === "INVALID_CREDENTIALS"
-        ? ["Incorrect username or password"]
-        : apiError.formErrors,
-  };
-};
-
-export const signIn = createAsyncThunk<
-  SigninResponse,
-  Credentials,
-  { rejectValue: ApiError }
->(
-  "auth/signIn",
-  async (payload, { rejectWithValue }) => {
-    try {
-      return await apiRequest<SigninResponse>("/api/auth/signin", {
-        method: "POST",
-        data: payload,
-      });
-    } catch (error) {
-      return rejectWithValue(rejectSignInError(error));
-    }
-  },
-  {
-    condition: (_, { getState }) =>
-      (getState() as { auth: AuthState }).auth.status !== "loading",
-  },
-);
 
 const thunks = [
   signIn,
@@ -155,4 +95,13 @@ const authSlice = createSlice({
 });
 
 export const { clearAuthRequest } = authSlice.actions;
+export {
+  signIn,
+  signUp,
+  logout,
+  forgotPassword,
+  resetPassword,
+  verifyEmail,
+  resendVerification,
+};
 export default authSlice.reducer;

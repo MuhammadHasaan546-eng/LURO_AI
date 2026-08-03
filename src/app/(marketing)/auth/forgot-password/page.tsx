@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import AuthShell from "@/components/auth/AuthShell";
-import { forgotPassword } from "@/store/authSlice";
+import { forgotPassword } from "@/store/auth/slice/authSlice";
 import { useAppDispatch, useAppSelector } from "@/store";
 
 export default function ForgotPasswordPage() {

@@ -5,8 +5,8 @@ import Link from "next/link";
 import { toast } from "sonner";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { resendVerification } from "@/store/authSlice";
-import { fetchAccount, mutateAccount } from "@/store/accountSlice";
+import { resendVerification } from "@/store/auth/slice/authSlice";
+import { fetchAccount, mutateAccount } from "@/store/account/slice/accountSlice";
 import { useAppDispatch, useAppSelector } from "@/store";
 
 export default function AccountPanel() {
