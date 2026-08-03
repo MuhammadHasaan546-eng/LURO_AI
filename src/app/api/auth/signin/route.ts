@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { SignInSchema } from "@/signin-schema";
+import { sendWelcomeBackEmail } from "@/lib/auth-notifications";
 import {
   audit,
   createSession,
@@ -99,6 +100,26 @@ async function signIn(request: Request) {
   });
   await createSession(user.id, request);
   await audit("signin", "SUCCESS", user.id, request).catch(() => undefined);
+  const loginNotificationClaimedAt = new Date();
+  const loginNotificationClaimed = await db.user.claimNotification({
+    id: user.id,
+    field: "loginNotificationSentAt",
+    before: new Date(Date.now() - 15 * 60 * 1000),
+    now: loginNotificationClaimedAt,
+  });
+  if (loginNotificationClaimed) {
+    const notification = await sendWelcomeBackEmail({
+      email: user.email,
+      firstName: user.firstName,
+      loginAt: loginNotificationClaimedAt,
+    });
+    if (notification.status === "failed")
+      await db.user.releaseNotification({
+        id: user.id,
+        field: "loginNotificationSentAt",
+        claimedAt: loginNotificationClaimedAt,
+      });
+  }
   return NextResponse.json({
     user: {
       id: user.id,

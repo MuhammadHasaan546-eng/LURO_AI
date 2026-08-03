@@ -42,6 +42,8 @@ const userSchema = new Schema(
     passwordHash: { ...nullableString, select: false },
     passwordChangedAt: { type: Date, default: null },
     lastAuthenticatedAt: { type: Date, default: null },
+    welcomeEmailSentAt: { type: Date, default: null },
+    loginNotificationSentAt: { type: Date, default: null },
   },
   schemaOptions,
 );

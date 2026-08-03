@@ -133,6 +133,43 @@ export const db = {
         ),
       );
     },
+    claimNotification: async ({
+      id,
+      field,
+      before,
+      now,
+    }: {
+      id: string;
+      field: "welcomeEmailSentAt" | "loginNotificationSentAt";
+      before: Date;
+      now: Date;
+    }) => {
+      await connectToDatabase();
+      const claimed = await UserModel.findOneAndUpdate(
+        {
+          id,
+          $or: [{ [field]: null }, { [field]: { $lt: before } }],
+        },
+        { $set: { [field]: now } },
+        { new: false, runValidators: true },
+      ).lean();
+      return Boolean(claimed);
+    },
+    releaseNotification: async ({
+      id,
+      field,
+      claimedAt,
+    }: {
+      id: string;
+      field: "welcomeEmailSentAt" | "loginNotificationSentAt";
+      claimedAt: Date;
+    }) => {
+      await connectToDatabase();
+      await UserModel.updateOne(
+        { id, [field]: claimedAt },
+        { $set: { [field]: null } },
+      );
+    },
     delete: async ({ where }: { where: { id: string } }) =>
       withMongoTransaction(async (session) => {
         const user = await leanOne<User>(

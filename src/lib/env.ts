@@ -34,6 +34,20 @@ const environmentSchema = Joi.object({
   APPLE_KEY_ID: Joi.string().trim().max(128),
   APPLE_PRIVATE_KEY: Joi.string().max(16384),
   EMAIL_FROM: Joi.string().email().max(254),
+  EMAIL_APP_NAME: Joi.string().trim().min(1).max(100).default("Luro AI"),
+  AUTH_NOTIFICATION_EMAILS_ENABLED: Joi.boolean()
+    .truthy("true")
+    .falsy("false")
+    .default(false),
+  SOCIAL_X_URL: Joi.string()
+    .uri({ scheme: ["https"] })
+    .max(2048),
+  SOCIAL_LINKEDIN_URL: Joi.string()
+    .uri({ scheme: ["https"] })
+    .max(2048),
+  SOCIAL_INSTAGRAM_URL: Joi.string()
+    .uri({ scheme: ["https"] })
+    .max(2048),
   SMTP_HOST: Joi.string().hostname().max(253),
   SMTP_PORT: Joi.number().integer().valid(465, 587),
   SMTP_SECURE: Joi.boolean().truthy("true").falsy("false"),
@@ -139,6 +153,11 @@ export const env = value as {
   APPLE_KEY_ID?: string;
   APPLE_PRIVATE_KEY?: string;
   EMAIL_FROM?: string;
+  EMAIL_APP_NAME: string;
+  AUTH_NOTIFICATION_EMAILS_ENABLED: boolean;
+  SOCIAL_X_URL?: string;
+  SOCIAL_LINKEDIN_URL?: string;
+  SOCIAL_INSTAGRAM_URL?: string;
   SMTP_HOST?: string;
   SMTP_PORT?: 465 | 587;
   SMTP_SECURE?: boolean;

@@ -4,6 +4,7 @@ import { SignUpSchema } from "@/signup-schema";
 import { audit, createSession, hashPassword, issueAuthToken } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+import { sendWelcomeEmail } from "@/lib/auth-notifications";
 
 const genericDuplicateResponse = () =>
   NextResponse.json(
@@ -80,6 +81,25 @@ export async function POST(request: Request) {
     );
     await audit("signup", "SUCCESS", user.id, request);
     await createSession(user.id, request);
+    const welcomeClaimedAt = new Date();
+    if (
+      await db.user.claimNotification({
+        id: user.id,
+        field: "welcomeEmailSentAt",
+        before: new Date(0),
+        now: welcomeClaimedAt,
+      })
+    ) {
+      const notification = await sendWelcomeEmail(user).catch(() => ({
+        status: "failed" as const,
+      }));
+      if (notification.status === "failed")
+        await db.user.releaseNotification({
+          id: user.id,
+          field: "welcomeEmailSentAt",
+          claimedAt: welcomeClaimedAt,
+        });
+    }
     if (env.EMAIL_WEBHOOK_URL) {
       await fetch(env.EMAIL_WEBHOOK_URL, {
         method: "POST",
