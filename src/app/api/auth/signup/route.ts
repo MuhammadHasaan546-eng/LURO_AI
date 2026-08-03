@@ -93,7 +93,7 @@ export async function POST(request: Request) {
       const notification = await sendWelcomeEmail(user).catch(() => ({
         status: "failed" as const,
       }));
-      if (notification.status === "failed")
+      if (notification.status !== "sent")
         await db.user.releaseNotification({
           id: user.id,
           field: "welcomeEmailSentAt",

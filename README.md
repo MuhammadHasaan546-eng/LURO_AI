@@ -29,6 +29,11 @@ SMTP_SECURE="true"
 SMTP_USER="muhammadhasaanm546@gmail.com"
 SMTP_PASS="your-google-app-password"
 EMAIL_FROM="muhammadhasaanm546@gmail.com"
+AUTH_NOTIFICATION_EMAILS_ENABLED="true"
+EMAIL_APP_NAME="Luro AI"
+SOCIAL_X_URL="https://x.com/your-handle"
+SOCIAL_LINKEDIN_URL="https://www.linkedin.com/company/your-company"
+SOCIAL_INSTAGRAM_URL="https://www.instagram.com/your-handle"
 ```
 
 Production requires a randomly generated `AUTH_SECRET`, HTTPS `APP_URL`, HTTPS-only cookies, a real email delivery integration, and provider credentials. Missing or partial provider configuration is rejected. Token values are sent only to the configured mailer integration and are not logged or stored in plaintext.
@@ -48,9 +53,11 @@ The credential-free template is in [`.env.example`](.env.example). Copy it to `.
 !.env.example
 ```
 
-Gmail supports both SMTP ports. Use port `465` with `SMTP_SECURE="true"` for implicit TLS, as shown above, or port `587` with `SMTP_SECURE="false"` to connect with STARTTLS. Do not set `secure` to `true` on port 587. The server-side transporter, verification call, and complete `sendMail` example are in [`src/lib/mailer.ts`](src/lib/mailer.ts).
+Gmail supports both SMTP ports. Use port `465` with `SMTP_SECURE="true"` for implicit TLS, as shown above, or port `587` with `SMTP_SECURE="false"` to connect with STARTTLS. Do not set `secure` to `true` on port 587. The server-side transporter and verification call are in [`src/lib/mailer.ts`](src/lib/mailer.ts).
 
-Use [`verifyMailConnection()`](src/lib/mailer.ts:55) during a health check or startup check, and [`sendExampleEmail()`](src/lib/mailer.ts:65) only as a test/example. Import this module only from server-side code; it is protected by `server-only`.
+Authentication notifications are opt-in through `AUTH_NOTIFICATION_EMAILS_ENABLED`. Signup sends one welcome message; successful password login sends a welcome-back/security message at most once per 15-minute window. Atomic database claims prevent concurrent duplicate sends, and failed or disabled delivery releases the claim for a later retry. The responsive HTML and plain-text templates, recipient validation, content escaping, and reusable delivery functions are in [`src/lib/auth-notifications.ts`](src/lib/auth-notifications.ts). Set official HTTPS social URLs to include them in both templates. Authentication succeeds even when SMTP is unavailable, while delivery responses remain internal so provider details and recipient data are not exposed.
+
+Use [`verifyMailConnection()`](src/lib/mailer.ts:40) during a health check or startup check. Import the mail modules only from server-side code; they are protected by `server-only`.
 
 ### Gmail troubleshooting
 

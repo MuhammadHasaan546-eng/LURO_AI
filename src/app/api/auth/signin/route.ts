@@ -113,7 +113,7 @@ async function signIn(request: Request) {
       firstName: user.firstName,
       loginAt: loginNotificationClaimedAt,
     });
-    if (notification.status === "failed")
+    if (notification.status !== "sent")
       await db.user.releaseNotification({
         id: user.id,
         field: "loginNotificationSentAt",
