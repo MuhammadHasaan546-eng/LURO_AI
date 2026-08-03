@@ -89,9 +89,9 @@ export const Navbar = ({ isAuthenticated }: NavbarProps) => {
         <div className="flex h-14 items-center justify-between gap-3 px-3 sm:h-16 sm:px-4 lg:px-5">
           {/* Logo Brand */}
           <Link
-            href="#top"
+            href="/"
             aria-label="Luro home"
-            onClick={() => selectItem("#top")}
+            onClick={() => selectItem("/")}
             className="group flex shrink-0 items-center gap-2.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
           >
             <span

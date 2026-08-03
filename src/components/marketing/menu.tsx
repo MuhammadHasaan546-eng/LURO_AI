@@ -34,20 +34,20 @@ const featureList = [
   {
     title: "Social Automation",
     description: "Automate posts across your social platforms seamlessly.",
-    href: "#automation",
+    href: "/automation",
     icon: Bot,
     badge: "Popular",
   },
   {
     title: "AI Analytics",
     description: "Real-time engagement metrics powered by AI.",
-    href: "#analytics",
+    href: "/analytics",
     icon: BarChart3,
   },
   {
     title: "Content Scheduler",
     description: "Plan and calendar marketing content in advance.",
-    href: "#scheduler",
+    href: "/scheduler",
     icon: CalendarDays,
   },
 ];
@@ -56,19 +56,19 @@ const resourceList = [
   {
     title: "Documentation",
     description: "Guides and API reference for integrating Luro AI.",
-    href: "#docs",
+    href: "/docs",
     icon: BookOpen,
   },
   {
     title: "Blog",
     description: "Latest updates, marketing tips, and product news.",
-    href: "#blog",
+    href: "/blog",
     icon: Newspaper,
   },
   {
     title: "Community",
     description: "Connect with creators and share growth strategies.",
-    href: "#community",
+    href: "/community",
     icon: Users,
   },
 ];
@@ -82,7 +82,6 @@ export function Menu({
   const [openMobileFeatures, setOpenMobileFeatures] = useState(false);
   const [openMobileResources, setOpenMobileResources] = useState(false);
 
-  // Styling helper for desktop item states
   const linkStyle = inverted
     ? "text-slate-300 hover:bg-white/10 hover:text-white"
     : "text-slate-200 hover:bg-violet-500/10 hover:text-white";
@@ -94,9 +93,8 @@ export function Menu({
   if (mobile) {
     return (
       <div className="flex w-full flex-col gap-1.5 pt-1">
-        {/* 1. How to start */}
         <Link
-          href="#how-it-works"
+          href="/"
           onClick={() => onSelect("#how-it-works")}
           className={cn(
             "flex h-10 w-full items-center rounded-xl px-4 text-xs font-medium transition-all",
@@ -108,7 +106,6 @@ export function Menu({
           How to start
         </Link>
 
-        {/* 2. Features Accordion */}
         <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-900/40">
           <button
             type="button"
@@ -163,7 +160,6 @@ export function Menu({
           )}
         </div>
 
-        {/* 3. Pricing */}
         <Link
           href="#pricing"
           onClick={() => onSelect("#pricing")}
@@ -177,7 +173,6 @@ export function Menu({
           Pricing
         </Link>
 
-        {/* 4. Integrations */}
         <Link
           href="#integrations"
           onClick={() => onSelect("#integrations")}
@@ -191,7 +186,6 @@ export function Menu({
           Integrations
         </Link>
 
-        {/* 5. Resources Accordion */}
         <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-900/40">
           <button
             type="button"
@@ -383,8 +377,9 @@ export function Menu({
         </NavigationMenuItem>
       </NavigationMenuList>
 
-      <div className="absolute left-0 top-full flex justify-center">
-        <NavigationMenuViewport />
+      {/* FIXED VIEWPORT POSITIONING */}
+      <div className="absolute left-0 top-full flex w-full justify-center">
+        <NavigationMenuViewport className="origin-top-center relative mt-2.5 h-[var(--radix-navigation-menu-viewport-height)] w-full overflow-hidden rounded-2xl border border-violet-500/20 bg-slate-950/95 shadow-2xl transition-[width,height] duration-300 data-[state=closed]:animate-scale-out data-[state=open]:animate-scale-in" />
       </div>
     </NavigationMenu>
   );

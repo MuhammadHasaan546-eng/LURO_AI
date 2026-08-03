@@ -17,6 +17,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
+        suppressHydrationWarning
         className={cn(
           "min-h-screen bg-[#09090b] font-default text-white antialiased selection:bg-violet-500/30",
           inter.variable,
