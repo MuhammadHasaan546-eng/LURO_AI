@@ -13,6 +13,18 @@ const invalid = () =>
   NextResponse.json({ message: "Invalid email or password." }, { status: 401 });
 
 export async function POST(request: Request) {
+  const current = await getCurrentSession();
+  if (current) {
+    return NextResponse.json(
+      {
+        code: "ALREADY_AUTHENTICATED",
+        message: "You are already logged in.",
+        redirectTo: "/app",
+      },
+      { status: 409 },
+    );
+  }
+
   const body = await request.json().catch(() => null);
   const validation = SignInSchema.validate(body, {
     abortEarly: false,
@@ -66,12 +78,6 @@ export async function POST(request: Request) {
     where: { id: user.id },
     data: { lastAuthenticatedAt: new Date() },
   });
-  const current = await getCurrentSession();
-  if (current)
-    await db.session.update({
-      where: { id: current.id },
-      data: { revokedAt: new Date() },
-    });
   await createSession(user.id, request);
   await audit("signin", "SUCCESS", user.id, request);
   return NextResponse.json({

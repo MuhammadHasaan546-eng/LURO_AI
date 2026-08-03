@@ -43,7 +43,7 @@ export const accountNameSchema = Joi.object({
 }).options({ allowUnknown: false, abortEarly: false });
 export const passwordChangeSchema = Joi.object({
   currentPassword: Joi.string().min(1).max(1024).required(),
-  newPassword: Joi.string().min(12).max(1024).required(),
+  newPassword: Joi.string().min(8).max(1024).required(),
 }).options({ allowUnknown: false, abortEarly: false });
 export const emailSchema = Joi.object({
   email: Joi.string().trim().lowercase().max(254).email().required(),

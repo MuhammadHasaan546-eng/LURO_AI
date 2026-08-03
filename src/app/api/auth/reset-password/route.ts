@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 
 const schema = Joi.object({
   token: Joi.string().hex().length(64).required(),
-  password: Joi.string().min(12).max(1024).required(),
+  password: Joi.string().min(8).max(1024).required(),
   confirmPassword: Joi.any().valid(Joi.ref("password")).required(),
 }).options({ abortEarly: false, allowUnknown: false });
 export async function POST(request: Request) {

@@ -5,13 +5,7 @@ const EMAIL_MAX_LENGTH = 254;
 const PASSWORD_MAX_LENGTH = 1024;
 
 const email = Joi.string().trim().lowercase().max(EMAIL_MAX_LENGTH).email();
-const password = Joi.string()
-  .min(12)
-  .max(PASSWORD_MAX_LENGTH)
-  .pattern(/[a-z]/)
-  .pattern(/[A-Z]/)
-  .pattern(/\d/)
-  .pattern(/[^A-Za-z0-9]/);
+const password = Joi.string().min(8).max(PASSWORD_MAX_LENGTH);
 
 export const SignUpSchema = Joi.object({
   firstName: Joi.string().trim().min(1).max(NAME_MAX_LENGTH).required(),

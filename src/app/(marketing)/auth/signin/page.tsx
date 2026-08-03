@@ -1,10 +1,15 @@
-"use client";
-
-import React from "react";
+import { AlreadyAuthenticatedRedirect } from "@/components/auth/AlreadyAuthenticatedRedirect";
 import Signin from "@/components/auth/Signin";
 import LiquidChrome from "@/components/ui/LiquidChrome";
+import { getCurrentSession } from "@/lib/auth";
 
-const SigninPage = () => {
+const SigninPage = async () => {
+  const session = await getCurrentSession();
+
+  if (session) {
+    return <AlreadyAuthenticatedRedirect />;
+  }
+
   return (
     <main className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-black">
       <div className="absolute inset-0 z-0">

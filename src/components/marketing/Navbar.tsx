@@ -23,7 +23,11 @@ const ArrowIcon = () => (
   </svg>
 );
 
-export const Navbar = () => {
+interface NavbarProps {
+  isAuthenticated: boolean;
+}
+
+export const Navbar = ({ isAuthenticated }: NavbarProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeHash, setActiveHash] = useState("#product");
@@ -123,19 +127,31 @@ export const Navbar = () => {
 
           {/* Action Buttons */}
           <div className="hidden shrink-0 items-center gap-2.5 md:flex">
-            <Link
-              href="/auth/signin"
-              className="inline-flex h-9 items-center justify-center rounded-xl px-4 text-xs font-semibold text-slate-300 transition-all duration-200 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/auth/signup"
-              className="group inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-pink-600 px-4 text-xs font-semibold text-white shadow-md shadow-violet-950/50 transition-all duration-200 hover:scale-[1.02] hover:from-violet-500 hover:to-pink-500 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
-            >
-              Start free
-              <ArrowIcon />
-            </Link>
+            {isAuthenticated ? (
+              <Link
+                href="/app"
+                className="group inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-pink-600 px-4 text-xs font-semibold text-white shadow-md shadow-violet-950/50 transition-all duration-200 hover:scale-[1.02] hover:from-violet-500 hover:to-pink-500 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+              >
+                Dashboard
+                <ArrowIcon />
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/auth/signin"
+                  className="inline-flex h-9 items-center justify-center rounded-xl px-4 text-xs font-semibold text-slate-300 transition-all duration-200 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+                >
+                  Log in
+                </Link>
+                <Link
+                  href="/auth/signup"
+                  className="group inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-pink-600 px-4 text-xs font-semibold text-white shadow-md shadow-violet-950/50 transition-all duration-200 hover:scale-[1.02] hover:from-violet-500 hover:to-pink-500 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                >
+                  Start free
+                  <ArrowIcon />
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Toggle Button */}
@@ -177,22 +193,40 @@ export const Navbar = () => {
           <div className="min-h-0 overflow-hidden rounded-b-2xl">
             <div className="flex flex-col gap-4 border-t border-white/10 px-4 pb-5 pt-4">
               <Menu activeHash={activeHash} onSelect={selectItem} mobile />
-              <div className="grid grid-cols-2 gap-2.5 border-t border-white/10 pt-4">
-                <Link
-                  href="/auth/signin"
-                  onClick={() => setIsOpen(false)}
-                  className="flex h-10 items-center justify-center rounded-xl border border-white/10 text-xs font-semibold text-slate-300 transition-all hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
-                >
-                  Log in
-                </Link>
-                <Link
-                  href="/auth/signup"
-                  onClick={() => setIsOpen(false)}
-                  className="group flex h-10 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-pink-600 text-xs font-semibold text-white shadow-md transition-all hover:from-violet-500 hover:to-pink-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
-                >
-                  Start free
-                  <ArrowIcon />
-                </Link>
+              <div
+                className={cn(
+                  "grid gap-2.5 border-t border-white/10 pt-4",
+                  isAuthenticated ? "grid-cols-1" : "grid-cols-2",
+                )}
+              >
+                {isAuthenticated ? (
+                  <Link
+                    href="/app"
+                    onClick={() => setIsOpen(false)}
+                    className="group flex h-10 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-pink-600 text-xs font-semibold text-white shadow-md transition-all hover:from-violet-500 hover:to-pink-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                  >
+                    Dashboard
+                    <ArrowIcon />
+                  </Link>
+                ) : (
+                  <>
+                    <Link
+                      href="/auth/signin"
+                      onClick={() => setIsOpen(false)}
+                      className="flex h-10 items-center justify-center rounded-xl border border-white/10 text-xs font-semibold text-slate-300 transition-all hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+                    >
+                      Log in
+                    </Link>
+                    <Link
+                      href="/auth/signup"
+                      onClick={() => setIsOpen(false)}
+                      className="group flex h-10 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-pink-600 text-xs font-semibold text-white shadow-md transition-all hover:from-violet-500 hover:to-pink-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
+                    >
+                      Start free
+                      <ArrowIcon />
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </div>

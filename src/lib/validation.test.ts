@@ -17,6 +17,33 @@ describe("Joi backend validation", () => {
     expect(result.value.firstName).toBe("Ada");
   });
 
+  it.each(["asdfghjk", "12345678", "jan98765"])(
+    "accepts an eight-character password without character-type rules: %s",
+    (password) => {
+      const result = SignUpSchema.validate({
+        firstName: "Jan",
+        lastName: "Khan",
+        email: "jan@example.com",
+        password,
+        confirmPassword: password,
+      });
+
+      expect(result.error).toBeUndefined();
+    },
+  );
+
+  it("rejects passwords shorter than eight characters", () => {
+    const result = SignUpSchema.validate({
+      firstName: "Jan",
+      lastName: "Khan",
+      email: "jan@example.com",
+      password: "1234567",
+      confirmPassword: "1234567",
+    });
+
+    expect(result.error).toBeDefined();
+  });
+
   it("rejects unknown signup fields and password mismatch", () => {
     const result = SignUpSchema.validate(
       {
