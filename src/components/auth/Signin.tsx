@@ -15,7 +15,7 @@ const inputClassName =
 export const Signin = () => {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { status, data, error, fieldErrors, formErrors } = useAppSelector(
+  const { status, error, fieldErrors, formErrors } = useAppSelector(
     (state) => state.auth,
   );
   const [email, setEmail] = useState("");

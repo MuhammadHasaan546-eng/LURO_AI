@@ -1,26 +1,24 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
-type SignupErrors = {
-  fieldErrors?: Record<string, string[]>;
-  formErrors?: string[];
-};
-
-type SignupResponse = SignupErrors & {
-  message?: string;
-};
+import { clearAuthRequest, signUp } from "@/store/authSlice";
+import { useAppDispatch, useAppSelector } from "@/store";
 
 const inputClassName =
   "w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-white transition backdrop-blur-md text-sm";
 
 export const SignUpPage = () => {
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { status, error, fieldErrors, formErrors } = useAppSelector(
+    (state) => state.auth,
+  );
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -30,58 +28,32 @@ export const SignUpPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirmation, setShowPasswordConfirmation] =
     useState(false);
-  const [errors, setErrors] = useState<SignupErrors>({});
-  const [loading, setLoading] = useState(false);
-
-  const fieldErrors = (field: string) => errors.fieldErrors?.[field] ?? [];
-  const formErrors = errors.formErrors ?? [];
+  const loading = status === "loading";
+  useEffect(
+    () => () => {
+      dispatch(clearAuthRequest());
+    },
+    [dispatch],
+  );
+  const fieldErrorList = (field: string) => fieldErrors[field] ?? [];
 
   const handleEmailSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setErrors({});
-    setLoading(true);
-
-    try {
-      const response = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          firstName,
-          lastName,
-          email,
-          password,
-          confirmPassword: passwordConfirmation,
-        }),
-      });
-
-      const data = (await response.json()) as SignupResponse;
-
-      if (!response.ok) {
-        const nextErrors: SignupErrors = {
-          fieldErrors: data.fieldErrors,
-          formErrors: data.formErrors,
-        };
-
-        if (!data.fieldErrors && !data.formErrors && data.message) {
-          nextErrors.formErrors = [data.message];
-        }
-
-        setErrors(nextErrors);
-        toast.error(data.message ?? "Unable to create your account.");
-        return;
-      }
-
-      toast.success("Account created successfully!");
+    const result = await dispatch(
+      signUp({
+        firstName,
+        lastName,
+        email,
+        password,
+        confirmPassword: passwordConfirmation,
+      }),
+    );
+    if (signUp.fulfilled.match(result)) {
+      toast.success(result.payload.message ?? "Account created successfully!");
       router.push("/app");
       router.refresh();
-    } catch {
-      const message = "Unable to create your account. Please try again.";
-      setErrors({ formErrors: [message] });
-      toast.error(message);
-    } finally {
-      setLoading(false);
+    } else if (signUp.rejected.match(result) && !result.meta.condition) {
+      toast.error(result.payload?.message ?? "Unable to create your account.");
     }
   };
 
@@ -105,12 +77,12 @@ export const SignUpPage = () => {
         </p>
       </div>
 
-      {formErrors.length > 0 && (
+      {(formErrors.length > 0 || error) && (
         <div
           role="alert"
           className="p-3 bg-red-500/20 border border-red-500/40 text-red-200 rounded-xl text-sm backdrop-blur-sm text-left"
         >
-          {formErrors.map((message, index) => (
+          {(formErrors.length ? formErrors : [error!]).map((message, index) => (
             <p key={`${message}-${index}`}>{message}</p>
           ))}
         </div>
@@ -133,9 +105,9 @@ export const SignUpPage = () => {
               placeholder="John"
               autoComplete="given-name"
               className={inputClassName}
-              aria-invalid={fieldErrors("firstName").length > 0}
+              aria-invalid={fieldErrorList("firstName").length > 0}
             />
-            {fieldErrors("firstName").map((message) => (
+            {fieldErrorList("firstName").map((message) => (
               <p key={message} className="mt-1 text-xs text-red-300">
                 {message}
               </p>
@@ -157,9 +129,9 @@ export const SignUpPage = () => {
               placeholder="Doe"
               autoComplete="family-name"
               className={inputClassName}
-              aria-invalid={fieldErrors("lastName").length > 0}
+              aria-invalid={fieldErrorList("lastName").length > 0}
             />
-            {fieldErrors("lastName").map((message) => (
+            {fieldErrorList("lastName").map((message) => (
               <p key={message} className="mt-1 text-xs text-red-300">
                 {message}
               </p>
@@ -183,9 +155,9 @@ export const SignUpPage = () => {
             placeholder="name@example.com"
             autoComplete="email"
             className={inputClassName}
-            aria-invalid={fieldErrors("email").length > 0}
+            aria-invalid={fieldErrorList("email").length > 0}
           />
-          {fieldErrors("email").map((message) => (
+          {fieldErrorList("email").map((message) => (
             <p key={message} className="mt-1 text-xs text-red-300">
               {message}
             </p>
@@ -210,7 +182,7 @@ export const SignUpPage = () => {
               autoComplete="new-password"
               maxLength={1024}
               className={`${inputClassName} pr-11`}
-              aria-invalid={fieldErrors("password").length > 0}
+              aria-invalid={fieldErrorList("password").length > 0}
             />
             <button
               type="button"
@@ -226,7 +198,7 @@ export const SignUpPage = () => {
               )}
             </button>
           </div>
-          {fieldErrors("password").map((message) => (
+          {fieldErrorList("password").map((message) => (
             <p key={message} className="mt-1 text-xs text-red-300">
               {message}
             </p>
@@ -251,7 +223,7 @@ export const SignUpPage = () => {
               autoComplete="new-password"
               maxLength={1024}
               className={`${inputClassName} pr-11`}
-              aria-invalid={fieldErrors("confirmPassword").length > 0}
+              aria-invalid={fieldErrorList("confirmPassword").length > 0}
             />
             <button
               type="button"
@@ -271,7 +243,7 @@ export const SignUpPage = () => {
               )}
             </button>
           </div>
-          {fieldErrors("confirmPassword").map((message) => (
+          {fieldErrorList("confirmPassword").map((message) => (
             <p key={message} className="mt-1 text-xs text-red-300">
               {message}
             </p>
@@ -283,7 +255,9 @@ export const SignUpPage = () => {
           disabled={loading}
           className="w-full bg-white text-black hover:bg-gray-100 font-semibold py-3 rounded-xl transition duration-200 disabled:opacity-50 shadow-lg text-sm"
         >
-          {loading ? "Creating account..." : "Create account"}
+          <span aria-live="polite">
+            {loading ? "Creating account..." : "Create account"}
+          </span>
         </button>
       </form>
 

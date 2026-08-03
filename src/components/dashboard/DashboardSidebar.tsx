@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, SearchIcon } from "lucide-react";
 import { toast } from "sonner";
+
+import { logout } from "@/store/authSlice";
+import { useAppDispatch, useAppSelector } from "@/store";
 
 import {
   Sidebar,
@@ -27,23 +30,21 @@ export const DashboardSidebar = () => {
   const pathname = usePathname();
   const router = useRouter();
   const { isMobile, setOpen, setOpenMobile } = useSidebar();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const dispatch = useAppDispatch();
+  const isLoggingOut = useAppSelector(
+    (state) =>
+      state.auth.status === "loading" && state.auth.operation === "logout",
+  );
 
   const handleLogout = async () => {
-    setIsLoggingOut(true);
-
-    try {
-      const response = await fetch("/api/auth/logout", { method: "POST" });
-
-      if (!response.ok) {
-        throw new Error("Logout request failed");
-      }
-
+    const result = await dispatch(logout());
+    if (logout.fulfilled.match(result)) {
       router.replace("/auth/signin");
       router.refresh();
-    } catch {
-      toast.error("Unable to log out. Please try again.");
-      setIsLoggingOut(false);
+    } else if (logout.rejected.match(result) && !result.meta.condition) {
+      toast.error(
+        result.payload?.message ?? "Unable to log out. Please try again.",
+      );
     }
   };
 

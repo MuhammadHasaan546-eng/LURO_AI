@@ -1,69 +1,107 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 
-type Account = {
-  user: {
-    email: string;
-    firstName: string;
-    lastName: string;
-    emailVerified: boolean;
-    hasPassword: boolean;
-    identities: { id: string; provider: string; email: string | null }[];
-  };
-  sessions: {
-    id: string;
-    current: boolean;
-    createdAt: string;
-    lastSeenAt: string;
-    userAgent: string | null;
-  }[];
-};
-const csrf = () =>
-  document.cookie
-    .split("; ")
-    .find((v) => v.startsWith("luro_csrf="))
-    ?.split("=")[1] ?? "";
-const request = (url: string, init: RequestInit = {}) =>
-  fetch(url, {
-    ...init,
-    headers: {
-      "content-type": "application/json",
-      "x-csrf-token": csrf(),
-      ...init.headers,
-    },
-  });
+import { Skeleton } from "@/components/ui/skeleton";
+import { resendVerification } from "@/store/authSlice";
+import { fetchAccount, mutateAccount } from "@/store/accountSlice";
+import { useAppDispatch, useAppSelector } from "@/store";
 
 export default function AccountPanel() {
-  const [data, setData] = useState<Account | null>(null);
-  const load = () =>
-    fetch("/api/account")
-      .then((r) => r.json())
-      .then(setData);
+  const dispatch = useAppDispatch();
+  const { data, status, isRefreshing, error, mutationStatus, mutationKind } =
+    useAppSelector((state) => state.account);
+  const authLoading = useAppSelector(
+    (state) => state.auth.status === "loading",
+  );
+
   useEffect(() => {
-    void load();
-  }, []);
-  const action = async (url: string, method: string, body?: unknown) => {
-    const response = await request(url, {
-      method,
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    const result = await response.json();
-    if (response.ok) toast.success(result.message);
-    else toast.error(result.message);
-    if (response.ok) await load();
-    return response.ok;
+    void dispatch(fetchAccount());
+  }, [dispatch]);
+
+  const action = async (payload: Parameters<typeof mutateAccount>[0]) => {
+    const result = await dispatch(mutateAccount(payload));
+    if (mutateAccount.fulfilled.match(result)) {
+      toast.success(result.payload.message);
+      if (result.payload.kind === "deleteAccount") location.href = "/";
+      else void dispatch(fetchAccount({ force: true }));
+      return true;
+    }
+    if (mutateAccount.rejected.match(result) && !result.meta.condition) {
+      toast.error(result.payload?.message ?? "Unable to update your account.");
+    }
+    return false;
   };
-  if (!data)
+
+  if (status === "loading" && !data) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-gray-400">
-        Loading account…
+      <div role="status" aria-label="Loading account" className="space-y-6">
+        <span className="sr-only">Loading account details…</span>
+        {[1, 2, 3].map((item) => (
+          <div
+            key={item}
+            className="rounded-2xl border border-white/10 bg-white/5 p-5"
+          >
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="mt-4 h-12 w-full" />
+            <Skeleton className="mt-3 h-12 w-2/3" />
+          </div>
+        ))}
       </div>
     );
+  }
+
+  if (status === "failed" && !data) {
+    return (
+      <div
+        role="alert"
+        className="rounded-2xl border border-red-500/30 bg-red-500/10 p-8 text-center"
+      >
+        <p className="text-red-200">
+          {error ?? "Unable to load your account."}
+        </p>
+        <button
+          onClick={() => dispatch(fetchAccount({ force: true }))}
+          className="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-medium text-black"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="rounded-2xl border border-white/10 p-8 text-center text-gray-400">
+        No account data is available.
+      </div>
+    );
+  }
+
+  const busy = mutationStatus === "loading";
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" aria-busy={isRefreshing}>
+      {isRefreshing && (
+        <p role="status" className="sr-only">
+          Refreshing account details…
+        </p>
+      )}
+      {error && (
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-sm text-amber-100"
+        >
+          {error}{" "}
+          <button
+            className="ml-2 underline"
+            onClick={() => dispatch(fetchAccount({ force: true }))}
+          >
+            Retry
+          </button>
+        </div>
+      )}
       {!data.user.emailVerified && (
         <section className="rounded-2xl border border-amber-400/25 bg-amber-400/10 p-5">
           <h2 className="font-medium text-amber-100">Verify your email</h2>
@@ -71,10 +109,20 @@ export default function AccountPanel() {
             Verification protects recovery and sensitive account changes.
           </p>
           <button
-            onClick={() => action("/api/auth/resend-verification", "POST")}
-            className="mt-3 rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-black"
+            disabled={authLoading}
+            onClick={async () => {
+              const result = await dispatch(resendVerification());
+              if (resendVerification.fulfilled.match(result))
+                toast.success(result.payload.message);
+              else if (
+                resendVerification.rejected.match(result) &&
+                !result.meta.condition
+              )
+                toast.error(result.payload?.message);
+            }}
+            className="mt-3 rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-black disabled:opacity-50"
           >
-            Resend verification
+            {authLoading ? "Sending…" : "Resend verification"}
           </button>
         </section>
       )}
@@ -82,10 +130,11 @@ export default function AccountPanel() {
         <h2 className="text-lg font-medium">Profile</h2>
         <form
           className="mt-4 grid gap-3 sm:grid-cols-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const form = new FormData(e.currentTarget);
-            void action("/api/account", "PATCH", {
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            void action({
+              kind: "profile",
               firstName: form.get("firstName"),
               lastName: form.get("lastName"),
             });
@@ -106,8 +155,11 @@ export default function AccountPanel() {
           <div className="text-sm text-gray-400 sm:col-span-2">
             {data.user.email}
           </div>
-          <button className="w-fit rounded-lg bg-white px-4 py-2 text-sm font-medium text-black">
-            Save profile
+          <button
+            disabled={busy}
+            className="w-fit rounded-lg bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-50"
+          >
+            {busy && mutationKind === "profile" ? "Saving…" : "Save profile"}
           </button>
         </form>
       </section>
@@ -119,19 +171,26 @@ export default function AccountPanel() {
               Email and password
             </div>
           )}
-          {data.user.identities.map((id) => (
+          {!data.user.hasPassword && data.user.identities.length === 0 && (
+            <p className="rounded-xl border border-dashed border-white/15 p-4 text-sm text-gray-400">
+              No sign-in methods are available.
+            </p>
+          )}
+          {data.user.identities.map((identity) => (
             <div
-              key={id.id}
+              key={identity.id}
               className="flex items-center justify-between rounded-xl border border-white/10 p-3 text-sm"
             >
               <span className="capitalize">
-                {id.provider.toLowerCase()} {id.email && `· ${id.email}`}
+                {identity.provider.toLowerCase()}{" "}
+                {identity.email && `· ${identity.email}`}
               </span>
               <button
+                disabled={busy}
                 onClick={() =>
-                  action(`/api/account/providers/${id.id}`, "DELETE")
+                  action({ kind: "removeProvider", id: identity.id })
                 }
-                className="text-red-300"
+                className="text-red-300 disabled:opacity-50"
               >
                 Remove
               </button>
@@ -154,13 +213,14 @@ export default function AccountPanel() {
         </div>
         <form
           className="mt-5 grid gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const f = new FormData(e.currentTarget);
-            void action("/api/account/password", "POST", {
-              currentPassword: f.get("currentPassword"),
-              password: f.get("password"),
-              confirmPassword: f.get("confirmPassword"),
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            void action({
+              kind: "password",
+              currentPassword: form.get("currentPassword"),
+              password: form.get("password"),
+              confirmPassword: form.get("confirmPassword"),
             });
           }}
         >
@@ -190,8 +250,13 @@ export default function AccountPanel() {
             placeholder="Confirm new password"
             className="rounded-xl border border-white/15 bg-black/20 px-4 py-3"
           />
-          <button className="w-fit rounded-lg bg-white px-4 py-2 text-sm font-medium text-black">
-            Update password
+          <button
+            disabled={busy}
+            className="w-fit rounded-lg bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-50"
+          >
+            {busy && mutationKind === "password"
+              ? "Updating…"
+              : "Update password"}
           </button>
         </form>
       </section>
@@ -199,13 +264,19 @@ export default function AccountPanel() {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-medium">Active sessions</h2>
           <button
-            onClick={() => action("/api/account/security", "POST")}
-            className="text-sm text-violet-300"
+            disabled={busy}
+            onClick={() => action({ kind: "revokeOtherSessions" })}
+            className="text-sm text-violet-300 disabled:opacity-50"
           >
             Revoke all others
           </button>
         </div>
         <div className="mt-4 space-y-3">
+          {data.sessions.length === 0 && (
+            <p className="rounded-xl border border-dashed border-white/15 p-4 text-sm text-gray-400">
+              No active sessions were found.
+            </p>
+          )}
           {data.sessions.map((session) => (
             <div
               key={session.id}
@@ -223,10 +294,11 @@ export default function AccountPanel() {
               </div>
               {!session.current && (
                 <button
+                  disabled={busy}
                   onClick={() =>
-                    action(`/api/account/sessions/${session.id}`, "DELETE")
+                    action({ kind: "revokeSession", id: session.id })
                   }
-                  className="text-red-300"
+                  className="text-red-300 disabled:opacity-50"
                 >
                   Revoke
                 </button>
@@ -241,17 +313,18 @@ export default function AccountPanel() {
           Permanently deletes your account and authentication data.
         </p>
         <button
-          onClick={async () => {
+          disabled={busy}
+          onClick={() => {
             if (
               confirm("Permanently delete your account? This cannot be undone.")
-            ) {
-              if (await action("/api/account/security", "DELETE"))
-                location.href = "/";
-            }
+            )
+              void action({ kind: "deleteAccount" });
           }}
-          className="mt-3 rounded-lg border border-red-400/30 px-3 py-2 text-sm text-red-200"
+          className="mt-3 rounded-lg border border-red-400/30 px-3 py-2 text-sm text-red-200 disabled:opacity-50"
         >
-          Delete my account
+          {busy && mutationKind === "deleteAccount"
+            ? "Deleting…"
+            : "Delete my account"}
         </button>
       </section>
     </div>
