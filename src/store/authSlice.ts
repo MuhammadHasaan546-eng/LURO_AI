@@ -57,6 +57,24 @@ const rejectApiError = (error: unknown, fallback: string) => {
   };
 };
 
+const rejectSignInError = (error: unknown) => {
+  const apiError = rejectApiError(
+    error,
+    "Unable to sign in. Please try again.",
+  );
+  return {
+    ...apiError,
+    message:
+      apiError.status === 401 || apiError.code === "INVALID_CREDENTIALS"
+        ? "Incorrect username or password"
+        : apiError.message,
+    formErrors:
+      apiError.status === 401 || apiError.code === "INVALID_CREDENTIALS"
+        ? ["Incorrect username or password"]
+        : apiError.formErrors,
+  };
+};
+
 export const signIn = createAsyncThunk<
   SigninResponse,
   Credentials,
@@ -70,9 +88,7 @@ export const signIn = createAsyncThunk<
         data: payload,
       });
     } catch (error) {
-      return rejectWithValue(
-        rejectApiError(error, "Unable to sign in. Please try again."),
-      );
+      return rejectWithValue(rejectSignInError(error));
     }
   },
   {
@@ -270,7 +286,10 @@ const authSlice = createSlice({
           const payload = action.payload as ApiError | undefined;
           state.status = "failed";
           state.error =
-            payload?.message ?? action.error.message ?? "Request failed.";
+            payload?.message ??
+            (thunk === signIn
+              ? "Unable to sign in. Please try again."
+              : (action.error.message ?? "Request failed."));
           state.fieldErrors = payload?.fieldErrors ?? {};
           state.formErrors = payload?.formErrors ?? [state.error];
           state.currentRequestId = null;

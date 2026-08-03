@@ -10,9 +10,24 @@ import { db } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 const invalid = () =>
-  NextResponse.json({ message: "Invalid email or password." }, { status: 401 });
+  NextResponse.json(
+    {
+      code: "INVALID_CREDENTIALS",
+      message: "Incorrect username or password",
+    },
+    { status: 401 },
+  );
 
-export async function POST(request: Request) {
+const userNotFound = () =>
+  NextResponse.json(
+    {
+      code: "USER_NOT_FOUND",
+      message: "User does not exist. Please sign up.",
+    },
+    { status: 404 },
+  );
+
+async function signIn(request: Request) {
   const current = await getCurrentSession();
   if (current) {
     return NextResponse.json(
@@ -67,11 +82,15 @@ export async function POST(request: Request) {
       passwordHash: true,
     },
   });
+  if (!user) {
+    await audit("signin", "FAILURE", undefined, request).catch(() => undefined);
+    return userNotFound();
+  }
   if (
-    !user?.passwordHash ||
+    !user.passwordHash ||
     !(await verifyPassword(password, user.passwordHash))
   ) {
-    await audit("signin", "FAILURE", user?.id, request);
+    await audit("signin", "FAILURE", user.id, request).catch(() => undefined);
     return invalid();
   }
   await db.user.update({
@@ -79,7 +98,7 @@ export async function POST(request: Request) {
     data: { lastAuthenticatedAt: new Date() },
   });
   await createSession(user.id, request);
-  await audit("signin", "SUCCESS", user.id, request);
+  await audit("signin", "SUCCESS", user.id, request).catch(() => undefined);
   return NextResponse.json({
     user: {
       id: user.id,
@@ -88,4 +107,15 @@ export async function POST(request: Request) {
       lastName: user.lastName,
     },
   });
+}
+
+export async function POST(request: Request) {
+  try {
+    return await signIn(request);
+  } catch {
+    return NextResponse.json(
+      { message: "Unable to sign in. Please try again." },
+      { status: 500 },
+    );
+  }
 }

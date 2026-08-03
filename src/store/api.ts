@@ -2,6 +2,7 @@ import axios, { isAxiosError, type AxiosRequestConfig } from "axios";
 
 export type ApiError = {
   message: string;
+  status?: number;
   fieldErrors?: Record<string, string[]>;
   formErrors?: string[];
   code?: string;
@@ -49,7 +50,10 @@ export const apiRequest = async <T>(
         | Partial<ApiError>
         | undefined;
       throw {
-        message: responseError?.message ?? error.message,
+        message:
+          responseError?.message ??
+          "The request could not be completed. Please try again.",
+        status: error.response?.status,
         fieldErrors: responseError?.fieldErrors,
         formErrors: responseError?.formErrors,
         code: responseError?.code,
