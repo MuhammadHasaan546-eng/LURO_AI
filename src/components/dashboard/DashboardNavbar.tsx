@@ -1,15 +1,38 @@
 "use client";
 
-import { HelpCircleIcon, ZapIcon } from "lucide-react";
+import { HelpCircleIcon, LogOutIcon, Loader2Icon, ZapIcon } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import React from "react";
 import Icons from "../global/icons";
+import { logout } from "@/store/auth/slice/authSlice";
+import { useAppDispatch, useAppSelector } from "@/store";
+import { toast } from "sonner";
 import { Button } from "../ui/button";
 import Container from "../global/container";
 import { SidebarTrigger, useSidebar } from "../ui/sidebar";
 
 const DashboardNavbar = () => {
   const { openMobile } = useSidebar();
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const isLoggingOut = useAppSelector(
+    (state) =>
+      state.auth.status === "loading" && state.auth.operation === "logout",
+  );
+
+  const handleLogout = async () => {
+    const result = await dispatch(logout());
+    if (logout.fulfilled.match(result)) {
+      toast.success("You have been logged out securely.");
+      router.replace("/auth/signin");
+      router.refresh();
+    } else if (logout.rejected.match(result) && !result.meta.condition) {
+      toast.error(
+        result.payload?.message ?? "Unable to log out. Please try again.",
+      );
+    }
+  };
 
   return (
     <header
@@ -30,6 +53,22 @@ const DashboardNavbar = () => {
           <Button size="sm" variant="ghost">
             <ZapIcon className="size-4 mr-1.5 text-orange-500 fill-orange-500 " />
             Upgrade
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            aria-label="Log out of your account"
+            className="text-muted-foreground hover:text-destructive"
+          >
+            {isLoggingOut ? (
+              <Loader2Icon className="size-4 mr-1.5 animate-spin" />
+            ) : (
+              <LogOutIcon className="size-4 mr-1.5" />
+            )}
+            {isLoggingOut ? "Logging out..." : "Logout"}
           </Button>
 
           <Button

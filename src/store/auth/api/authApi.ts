@@ -36,8 +36,38 @@ export const signUpRequest = (payload: SignupPayload) =>
     data: payload,
   });
 
-export const logoutRequest = () =>
-  apiRequest<AuthResponse>("/api/auth/logout", { method: "POST" });
+const clearClientAuthArtifacts = () => {
+  if (typeof window === "undefined") return;
+
+  // The session cookie is HttpOnly and is cleared by the server. Remove the
+  // readable CSRF cookie and any legacy client-side auth values as defense in
+  // depth so credentials cannot survive a successful logout.
+  document.cookie =
+    "luro_csrf=; Path=/; Max-Age=0; SameSite=Lax" +
+    (window.location.protocol === "https:" ? "; Secure" : "");
+
+  const authStorageKeys = [
+    "luro_token",
+    "luro_access_token",
+    "luro_refresh_token",
+    "authToken",
+    "accessToken",
+    "refreshToken",
+  ];
+
+  for (const key of authStorageKeys) {
+    window.localStorage.removeItem(key);
+    window.sessionStorage.removeItem(key);
+  }
+};
+
+export const logoutRequest = async () => {
+  const response = await apiRequest<AuthResponse>("/api/auth/logout", {
+    method: "POST",
+  });
+  clearClientAuthArtifacts();
+  return response;
+};
 
 export const forgotPasswordRequest = (email: string) =>
   apiRequest<AuthResponse>("/api/auth/forgot-password", {
