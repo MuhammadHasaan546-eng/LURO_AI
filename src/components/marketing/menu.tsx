@@ -161,11 +161,11 @@ export function Menu({
         </div>
 
         <Link
-          href="#pricing"
-          onClick={() => onSelect("#pricing")}
+          href="/pricing"
+          onClick={() => onSelect("/pricing")}
           className={cn(
             "flex h-10 w-full items-center rounded-xl px-4 text-xs font-medium transition-all",
-            activeHash === "#pricing"
+            activeHash === "/pricing"
               ? activeLinkStyle
               : "text-slate-300 hover:bg-white/5 hover:text-white",
           )}
@@ -174,11 +174,11 @@ export function Menu({
         </Link>
 
         <Link
-          href="#integrations"
-          onClick={() => onSelect("#integrations")}
+          href="/integrations"
+          onClick={() => onSelect("/integrations")}
           className={cn(
             "flex h-10 w-full items-center rounded-xl px-4 text-xs font-medium transition-all",
-            activeHash === "#integrations"
+            activeHash === "/integrations"
               ? activeLinkStyle
               : "text-slate-300 hover:bg-white/5 hover:text-white",
           )}
@@ -241,11 +241,11 @@ export function Menu({
         <NavigationMenuItem>
           <NavigationMenuLink asChild>
             <Link
-              href="#how-it-works"
-              onClick={() => onSelect("#how-it-works")}
+              href="/"
+              onClick={() => onSelect("/")}
               className={cn(
                 "flex h-9 items-center rounded-xl px-3.5 text-xs font-semibold transition-all",
-                activeHash === "#how-it-works" ? activeLinkStyle : linkStyle,
+                activeHash === "/" ? activeLinkStyle : linkStyle,
               )}
             >
               How to start
@@ -306,11 +306,11 @@ export function Menu({
         <NavigationMenuItem>
           <NavigationMenuLink asChild>
             <Link
-              href="#pricing"
-              onClick={() => onSelect("#pricing")}
+              href="/pricing"
+              onClick={() => onSelect("/pricing")}
               className={cn(
                 "flex h-9 items-center rounded-xl px-3.5 text-xs font-semibold transition-all",
-                activeHash === "#pricing" ? activeLinkStyle : linkStyle,
+                activeHash === "/pricing" ? activeLinkStyle : linkStyle,
               )}
             >
               Pricing
@@ -322,11 +322,11 @@ export function Menu({
         <NavigationMenuItem>
           <NavigationMenuLink asChild>
             <Link
-              href="#integrations"
-              onClick={() => onSelect("#integrations")}
+              href="/integrations"
+              onClick={() => onSelect("/integrations")}
               className={cn(
                 "flex h-9 items-center rounded-xl px-3.5 text-xs font-semibold transition-all",
-                activeHash === "#integrations" ? activeLinkStyle : linkStyle,
+                activeHash === "/integrations" ? activeLinkStyle : linkStyle,
               )}
             >
               Integrations
@@ -339,7 +339,7 @@ export function Menu({
           <NavigationMenuTrigger
             className={cn(
               "h-9 rounded-xl bg-transparent px-3.5 text-xs font-semibold transition-all focus:bg-transparent active:bg-transparent data-[state=open]:bg-violet-500/10 data-[state=open]:text-white",
-              activeHash === "#resources" ? activeLinkStyle : linkStyle,
+              activeHash === "/resources" ? activeLinkStyle : linkStyle,
             )}
           >
             Resources

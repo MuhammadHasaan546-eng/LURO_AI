@@ -1,84 +1,52 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-type SigninErrors = {
-  fieldErrors?: Record<string, string[]>;
-  formErrors?: string[];
-};
-
-type SigninResponse = SigninErrors & {
-  code?: "ALREADY_AUTHENTICATED";
-  message?: string;
-  redirectTo?: string;
-};
+import { clearAuthRequest, signIn } from "@/store/authSlice";
+import { useAppDispatch, useAppSelector } from "@/store";
 
 const inputClassName =
   "w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:border-white transition backdrop-blur-md text-sm";
 
 export const Signin = () => {
   const router = useRouter();
-
+  const dispatch = useAppDispatch();
+  const { status, data, error, fieldErrors, formErrors } = useAppSelector(
+    (state) => state.auth,
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState<SigninErrors>({});
-  const [loading, setLoading] = useState(false);
+  const loading = status === "loading";
 
-  const fieldErrors = (field: string) => errors.fieldErrors?.[field] ?? [];
-  const formErrors = errors.formErrors ?? [];
+  useEffect(
+    () => () => {
+      dispatch(clearAuthRequest());
+    },
+    [dispatch],
+  );
+
+  const fieldErrorList = (field: string) => fieldErrors[field] ?? [];
 
   const handleEmailAuth = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setErrors({});
-    setLoading(true);
-
-    try {
-      const response = await fetch("/api/auth/signin", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = (await response.json()) as SigninResponse;
-
-      if (data.code === "ALREADY_AUTHENTICATED") {
-        toast.info(data.message ?? "You are already logged in.", {
+    const result = await dispatch(signIn({ email, password }));
+    if (signIn.fulfilled.match(result)) {
+      if (result.payload.code === "ALREADY_AUTHENTICATED") {
+        toast.info(result.payload.message ?? "You are already logged in.", {
           id: "already-authenticated",
         });
-        router.replace(data.redirectTo ?? "/app");
-        return;
+        router.replace(result.payload.redirectTo ?? "/app");
+      } else {
+        toast.success("Successfully logged in!");
+        router.push("/app");
+        router.refresh();
       }
-
-      if (!response.ok) {
-        const nextErrors: SigninErrors = {
-          fieldErrors: data.fieldErrors,
-          formErrors: data.formErrors,
-        };
-
-        if (!data.fieldErrors && !data.formErrors && data.message) {
-          nextErrors.formErrors = [data.message];
-        }
-
-        setErrors(nextErrors);
-        toast.error(data.message ?? "Unable to sign in.");
-        return;
-      }
-
-      toast.success("Successfully logged in!");
-      router.push("/app");
-      router.refresh();
-    } catch {
-      const message = "Unable to sign in. Please try again.";
-      setErrors({ formErrors: [message] });
-      toast.error(message);
-    } finally {
-      setLoading(false);
+    } else if (signIn.rejected.match(result) && !result.meta.condition) {
+      toast.error(result.payload?.message ?? "Unable to sign in.");
     }
   };
 
@@ -100,12 +68,12 @@ export const Signin = () => {
         </p>
       </div>
 
-      {formErrors.length > 0 && (
+      {(formErrors.length > 0 || error) && (
         <div
           role="alert"
           className="p-3 bg-red-500/20 border border-red-500/40 text-red-200 rounded-xl text-sm backdrop-blur-sm text-left"
         >
-          {formErrors.map((message, index) => (
+          {(formErrors.length ? formErrors : [error!]).map((message, index) => (
             <p key={`${message}-${index}`}>{message}</p>
           ))}
         </div>
@@ -128,9 +96,9 @@ export const Signin = () => {
             placeholder="name@example.com"
             autoComplete="email"
             className={inputClassName}
-            aria-invalid={fieldErrors("email").length > 0}
+            aria-invalid={fieldErrorList("email").length > 0}
           />
-          {fieldErrors("email").map((message) => (
+          {fieldErrorList("email").map((message) => (
             <p key={message} className="mt-1 text-xs text-red-300">
               {message}
             </p>
@@ -162,9 +130,9 @@ export const Signin = () => {
             autoComplete="current-password"
             maxLength={1024}
             className={inputClassName}
-            aria-invalid={fieldErrors("password").length > 0}
+            aria-invalid={fieldErrorList("password").length > 0}
           />
-          {fieldErrors("password").map((message) => (
+          {fieldErrorList("password").map((message) => (
             <p key={message} className="mt-1 text-xs text-red-300">
               {message}
             </p>
@@ -176,7 +144,9 @@ export const Signin = () => {
           disabled={loading}
           className="w-full bg-white text-black hover:bg-gray-100 font-semibold py-3 rounded-xl transition duration-200 disabled:opacity-50 shadow-lg text-sm"
         >
-          {loading ? "Signing in..." : "Sign in"}
+          <span aria-live="polite">
+            {loading ? "Signing in..." : "Sign in"}
+          </span>
         </button>
       </form>
 
