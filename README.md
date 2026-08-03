@@ -22,13 +22,42 @@ APPLE_CLIENT_ID="..."
 APPLE_TEAM_ID="..."
 APPLE_KEY_ID="..."
 APPLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----"
-# Optional email delivery webhook used by the token routes
-EMAIL_WEBHOOK_URL="https://mailer.example.com/auth-events"
-EMAIL_WEBHOOK_SECRET="at-least-16-random-characters"
-EMAIL_FROM="security@example.com"
+# Gmail SMTP email delivery. Use a Google App Password, never the account password.
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="465"
+SMTP_SECURE="true"
+SMTP_USER="muhammadhasaanm546@gmail.com"
+SMTP_PASS="your-google-app-password"
+EMAIL_FROM="muhammadhasaanm546@gmail.com"
 ```
 
-Production requires a randomly generated `AUTH_SECRET`, HTTPS `APP_URL`, HTTPS-only cookies, a real email delivery integration, and provider credentials. Missing or partial provider configuration is rejected. Token values are sent only to the configured mailer webhook and are not logged or stored in plaintext.
+Production requires a randomly generated `AUTH_SECRET`, HTTPS `APP_URL`, HTTPS-only cookies, a real email delivery integration, and provider credentials. Missing or partial provider configuration is rejected. Token values are sent only to the configured mailer integration and are not logged or stored in plaintext.
+
+## Gmail SMTP with Nodemailer
+
+Install the package with the exact command:
+
+```bash
+npm install nodemailer
+```
+
+The credential-free template is in [`.env.example`](.env.example). Copy it to `.env`, then set `SMTP_PASS` to the Google App Password created for `muhammadhasaanm546@gmail.com`. Do not paste the App Password into source code, logs, documentation, or version control. The required ignore rule is:
+
+```gitignore
+.env*
+!.env.example
+```
+
+Gmail supports both SMTP ports. Use port `465` with `SMTP_SECURE="true"` for implicit TLS, as shown above, or port `587` with `SMTP_SECURE="false"` to connect with STARTTLS. Do not set `secure` to `true` on port 587. The server-side transporter, verification call, and complete `sendMail` example are in [`src/lib/mailer.ts`](src/lib/mailer.ts).
+
+Use [`verifyMailConnection()`](src/lib/mailer.ts:55) during a health check or startup check, and [`sendExampleEmail()`](src/lib/mailer.ts:65) only as a test/example. Import this module only from server-side code; it is protected by `server-only`.
+
+### Gmail troubleshooting
+
+- **Authentication failed / `535`:** confirm the Gmail address is the full account address, 2-Step Verification is enabled, `SMTP_PASS` is the generated 16-character App Password (spaces may be removed), and the App Password was not revoked. Never use the normal Gmail password.
+- **Connection timeout / `ETIMEDOUT`:** verify outbound SMTP is permitted by the host, DNS resolves `smtp.gmail.com`, and the selected port is not blocked. Try port 587 with STARTTLS if port 465 is filtered.
+- **TLS or certificate errors:** use `smtp.gmail.com`, keep TLS certificate validation enabled, and ensure the runtime clock and Node.js installation are current.
+- **Gmail policy or rate limits:** check Google Account security alerts, Workspace administrator SMTP restrictions, sending quotas, and account recovery/security settings.
 
 ## MongoDB and local workflow
 

@@ -1,10 +1,14 @@
-"use client";
-
 import React from "react";
+import { redirect } from "next/navigation";
 import SignUpPage from "@/components/auth/Signup";
 import LiquidChrome from "@/components/ui/LiquidChrome";
+import { getCurrentSession } from "@/lib/auth";
 
-const SignupPage = () => {
+const SignupPage = async () => {
+  const session = await getCurrentSession();
+
+  if (session) redirect("/app");
+
   return (
     <main className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-black">
       <div className="absolute inset-0 z-0">

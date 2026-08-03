@@ -34,6 +34,11 @@ const environmentSchema = Joi.object({
   APPLE_KEY_ID: Joi.string().trim().max(128),
   APPLE_PRIVATE_KEY: Joi.string().max(16384),
   EMAIL_FROM: Joi.string().email().max(254),
+  SMTP_HOST: Joi.string().hostname().max(253),
+  SMTP_PORT: Joi.number().integer().valid(465, 587),
+  SMTP_SECURE: Joi.boolean().truthy("true").falsy("false"),
+  SMTP_USER: Joi.string().email().max(254),
+  SMTP_PASS: Joi.string().min(1).max(1024),
   EMAIL_WEBHOOK_URL: Joi.string()
     .uri({ scheme: ["https"] })
     .max(2048),
@@ -55,6 +60,31 @@ const environmentSchema = Joi.object({
           message: "MONGODB_URI must be explicitly configured in production",
         });
     }
+
+    const smtp = [
+      value.SMTP_HOST,
+      value.SMTP_PORT,
+      value.SMTP_SECURE,
+      value.SMTP_USER,
+      value.SMTP_PASS,
+    ];
+    const hasAnySmtpValue = smtp.some((item) => item !== undefined);
+    const hasAllSmtpValues = smtp.every(
+      (item) => item !== undefined && item !== "",
+    );
+    if (hasAnySmtpValue && !hasAllSmtpValues)
+      return helpers.error("any.custom", {
+        message:
+          "SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, and SMTP_PASS must all be configured together",
+      });
+    if (
+      hasAllSmtpValues &&
+      ((value.SMTP_PORT === 465 && value.SMTP_SECURE !== true) ||
+        (value.SMTP_PORT === 587 && value.SMTP_SECURE !== false))
+    )
+      return helpers.error("any.custom", {
+        message: "SMTP_SECURE must be true for port 465 and false for port 587",
+      });
 
     const google = [value.GOOGLE_CLIENT_ID, value.GOOGLE_CLIENT_SECRET];
     if (google.some(Boolean) && !google.every(Boolean))
@@ -109,6 +139,11 @@ export const env = value as {
   APPLE_KEY_ID?: string;
   APPLE_PRIVATE_KEY?: string;
   EMAIL_FROM?: string;
+  SMTP_HOST?: string;
+  SMTP_PORT?: 465 | 587;
+  SMTP_SECURE?: boolean;
+  SMTP_USER?: string;
+  SMTP_PASS?: string;
   EMAIL_WEBHOOK_URL?: string;
   EMAIL_WEBHOOK_SECRET?: string;
 };
