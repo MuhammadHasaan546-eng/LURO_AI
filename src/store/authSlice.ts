@@ -67,7 +67,7 @@ export const signIn = createAsyncThunk<
     try {
       return await apiRequest<SigninResponse>("/api/auth/signin", {
         method: "POST",
-        body: JSON.stringify(payload),
+        data: payload,
       });
     } catch (error) {
       return rejectWithValue(
@@ -91,7 +91,7 @@ export const signUp = createAsyncThunk<
     try {
       return await apiRequest<AuthResponse>("/api/auth/signup", {
         method: "POST",
-        body: JSON.stringify(payload),
+        data: payload,
       });
     } catch (error) {
       return rejectWithValue(
@@ -141,7 +141,7 @@ export const forgotPassword = createAsyncThunk<
     try {
       return await apiRequest<AuthResponse>("/api/auth/forgot-password", {
         method: "POST",
-        body: JSON.stringify({ email }),
+        data: { email },
       });
     } catch (error) {
       return rejectWithValue(
@@ -165,7 +165,7 @@ export const resetPassword = createAsyncThunk<
     try {
       return await apiRequest<AuthResponse>("/api/auth/reset-password", {
         method: "POST",
-        body: JSON.stringify(payload),
+        data: payload,
       });
     } catch (error) {
       return rejectWithValue(
@@ -189,7 +189,7 @@ export const verifyEmail = createAsyncThunk<
     try {
       return await apiRequest<AuthResponse>("/api/auth/verify-email", {
         method: "POST",
-        body: JSON.stringify({ token }),
+        data: { token },
       });
     } catch (error) {
       return rejectWithValue(

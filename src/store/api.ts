@@ -1,3 +1,5 @@
+import axios, { isAxiosError, type AxiosRequestConfig } from "axios";
+
 export type ApiError = {
   message: string;
   fieldErrors?: Record<string, string[]>;
@@ -14,27 +16,49 @@ const getCsrfToken = () =>
         .find((value) => value.startsWith("luro_csrf="))
         ?.split("=")[1] ?? "");
 
-export async function apiRequest<T>(
-  url: string,
-  init: RequestInit = {},
-): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      ...(init.body ? { "content-type": "application/json" } : {}),
-      ...(init.method && init.method !== "GET"
-        ? { "x-csrf-token": getCsrfToken() }
-        : {}),
-      ...init.headers,
-    },
-  });
+export const apiClient = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL ?? "",
+  withCredentials: true,
+  headers: { Accept: "application/json" },
+});
 
-  const data = (await response.json().catch(() => ({}))) as T & ApiError;
-  if (!response.ok) {
-    throw data;
+apiClient.interceptors.request.use((config) => {
+  if (config.method && config.method.toUpperCase() !== "GET") {
+    config.headers.set("x-csrf-token", getCsrfToken());
+    if (config.data !== undefined && !config.headers.has("Content-Type")) {
+      config.headers.set("Content-Type", "application/json");
+    }
   }
-  return data;
-}
+  return config;
+});
+
+export const apiRequest = async <T>(
+  url: string,
+  config: AxiosRequestConfig = {},
+): Promise<T> => {
+  try {
+    const response = await apiClient.request<T>({
+      url,
+      ...config,
+      headers: { Accept: "application/json", ...config.headers },
+    });
+    return response.data;
+  } catch (error) {
+    if (isAxiosError(error)) {
+      const responseError = error.response?.data as
+        | Partial<ApiError>
+        | undefined;
+      throw {
+        message: responseError?.message ?? error.message,
+        fieldErrors: responseError?.fieldErrors,
+        formErrors: responseError?.formErrors,
+        code: responseError?.code,
+        redirectTo: responseError?.redirectTo,
+      } satisfies ApiError;
+    }
+    throw { message: "The request could not be completed." } satisfies ApiError;
+  }
+};
 
 export const getApiError = (error: unknown, fallback: string) => {
   if (typeof error === "object" && error && "message" in error) {

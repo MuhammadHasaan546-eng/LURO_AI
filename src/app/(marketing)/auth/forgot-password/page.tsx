@@ -9,7 +9,6 @@ export default function ForgotPasswordPage() {
   const dispatch = useAppDispatch();
   const { status, data, error } = useAppSelector((state) => state.auth);
   const loading = status === "loading";
-
   return (
     <AuthShell>
       <div className="space-y-6 text-white">

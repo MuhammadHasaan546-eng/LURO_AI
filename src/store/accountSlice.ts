@@ -130,7 +130,7 @@ export const mutateAccount = createAsyncThunk<
     try {
       const response = await apiRequest<{ message: string }>(selected.url, {
         method: selected.method,
-        body: selected.body ? JSON.stringify(selected.body) : undefined,
+        data: selected.body,
       });
       return { ...response, kind: mutation.kind };
     } catch (error) {
