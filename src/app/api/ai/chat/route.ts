@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     await assertUsageAvailable(session.userId, "tokens", 1);
     const input = await parseBody<ChatInput>(request, chatSchema);
     await connectToDatabase();
-    let chat = input.chatId
+    const chat = input.chatId
       ? ((await ChatModel.findOne({
           id: input.chatId,
           userId: session.userId,

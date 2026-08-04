@@ -2,11 +2,8 @@ import "server-only";
 
 import { PDFParse } from "pdf-parse";
 import { env } from "@/lib/env";
-import {
-  completeText,
-  cosineSimilarity,
-  embedTexts,
-} from "@/lib/ai/generation";
+import { completeText, embedTexts } from "@/lib/ai/generation";
+import { cosineSimilarity } from "@/lib/ai/vector";
 import { HttpError } from "@/lib/ai/http";
 import { assertUsageAvailable, recordUsage } from "@/lib/ai/usage";
 import { connectToDatabase } from "@/lib/mongoose";

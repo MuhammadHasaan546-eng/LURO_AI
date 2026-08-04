@@ -5,7 +5,7 @@ import {
   socialSchema,
   translationSchema,
 } from "@/lib/ai/contracts";
-import { cosineSimilarity } from "@/lib/ai/generation";
+import { cosineSimilarity } from "@/lib/ai/vector";
 import { ChatModel, DocumentChunkModel, SubscriptionModel } from "@/models";
 
 describe("AI feature contracts", () => {
