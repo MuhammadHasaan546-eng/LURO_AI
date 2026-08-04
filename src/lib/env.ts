@@ -57,6 +57,63 @@ const environmentSchema = Joi.object({
     .uri({ scheme: ["https"] })
     .max(2048),
   EMAIL_WEBHOOK_SECRET: Joi.string().min(16).max(2048),
+  OPENAI_API_KEY: Joi.string().min(1).max(2048),
+  OPENAI_BASE_URL: Joi.string()
+    .uri({ scheme: ["https"] })
+    .max(2048)
+    .default("https://api.openai.com/v1"),
+  OPENAI_CHAT_MODEL: Joi.string().trim().min(1).max(100).default("gpt-4o-mini"),
+  OPENAI_IMAGE_MODEL: Joi.string()
+    .trim()
+    .min(1)
+    .max(100)
+    .default("gpt-image-1"),
+  OPENAI_EMBEDDING_MODEL: Joi.string()
+    .trim()
+    .min(1)
+    .max(100)
+    .default("text-embedding-3-small"),
+  CLOUDINARY_CLOUD_NAME: Joi.string().trim().min(1).max(255),
+  CLOUDINARY_API_KEY: Joi.string().trim().min(1).max(255),
+  CLOUDINARY_API_SECRET: Joi.string().min(1).max(2048),
+  STRIPE_SECRET_KEY: Joi.string().min(1).max(2048),
+  STRIPE_WEBHOOK_SECRET: Joi.string().min(1).max(2048),
+  STRIPE_PRO_PRICE_ID: Joi.string().trim().min(1).max(255),
+  APP_FREE_MONTHLY_TOKENS: Joi.number()
+    .integer()
+    .min(0)
+    .max(100_000_000)
+    .default(50_000),
+  APP_FREE_MONTHLY_IMAGES: Joi.number()
+    .integer()
+    .min(0)
+    .max(100_000)
+    .default(5),
+  APP_FREE_MONTHLY_PDF_PAGES: Joi.number()
+    .integer()
+    .min(0)
+    .max(100_000)
+    .default(50),
+  APP_PRO_MONTHLY_TOKENS: Joi.number()
+    .integer()
+    .min(0)
+    .max(1_000_000_000)
+    .default(1_000_000),
+  APP_PRO_MONTHLY_IMAGES: Joi.number()
+    .integer()
+    .min(0)
+    .max(1_000_000)
+    .default(100),
+  APP_PRO_MONTHLY_PDF_PAGES: Joi.number()
+    .integer()
+    .min(0)
+    .max(1_000_000)
+    .default(2_000),
+  APP_MAX_PDF_BYTES: Joi.number()
+    .integer()
+    .min(1024)
+    .max(50_000_000)
+    .default(10_000_000),
 })
   .unknown(true)
   .custom((value, helpers) => {
@@ -117,6 +174,27 @@ const environmentSchema = Joi.object({
         message: "All Apple credentials must be configured",
       });
 
+    const cloudinary = [
+      value.CLOUDINARY_CLOUD_NAME,
+      value.CLOUDINARY_API_KEY,
+      value.CLOUDINARY_API_SECRET,
+    ];
+    if (cloudinary.some(Boolean) && !cloudinary.every(Boolean))
+      return helpers.error("any.custom", {
+        message: "All Cloudinary credentials must be configured",
+      });
+
+    const stripe = [
+      value.STRIPE_SECRET_KEY,
+      value.STRIPE_WEBHOOK_SECRET,
+      value.STRIPE_PRO_PRICE_ID,
+    ];
+    if (stripe.some(Boolean) && !stripe.every(Boolean))
+      return helpers.error("any.custom", {
+        message:
+          "Stripe secret, webhook secret, and Pro price ID must be configured together",
+      });
+
     return value;
   }, "cross-field environment validation");
 
@@ -165,6 +243,24 @@ export const env = value as {
   SMTP_PASS?: string;
   EMAIL_WEBHOOK_URL?: string;
   EMAIL_WEBHOOK_SECRET?: string;
+  OPENAI_API_KEY?: string;
+  OPENAI_BASE_URL: string;
+  OPENAI_CHAT_MODEL: string;
+  OPENAI_IMAGE_MODEL: string;
+  OPENAI_EMBEDDING_MODEL: string;
+  CLOUDINARY_CLOUD_NAME?: string;
+  CLOUDINARY_API_KEY?: string;
+  CLOUDINARY_API_SECRET?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_PRO_PRICE_ID?: string;
+  APP_FREE_MONTHLY_TOKENS: number;
+  APP_FREE_MONTHLY_IMAGES: number;
+  APP_FREE_MONTHLY_PDF_PAGES: number;
+  APP_PRO_MONTHLY_TOKENS: number;
+  APP_PRO_MONTHLY_IMAGES: number;
+  APP_PRO_MONTHLY_PDF_PAGES: number;
+  APP_MAX_PDF_BYTES: number;
 };
 
 export const isGoogleEnabled = Boolean(

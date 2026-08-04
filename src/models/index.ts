@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
 import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
+import { productModels } from "@/models/product";
+
+export * from "@/models/product";
 
 const idField = {
   type: String,
@@ -204,4 +207,5 @@ export const applicationModels = [
   OAuthChallengeModel,
   RateLimitBucketModel,
   AuditEventModel,
+  ...productModels,
 ];
