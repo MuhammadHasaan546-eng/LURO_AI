@@ -1,20 +1,18 @@
 "use client";
 
-import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, SearchIcon } from "lucide-react";
+import { LogOut, Search } from "lucide-react";
 import { toast } from "sonner";
-
-import { logout } from "@/store/auth/slice/authSlice";
-import { useAppDispatch, useAppSelector } from "@/store";
-
+import { SIDEBAR_GROUPS } from "@/app/constant/links";
+import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -22,14 +20,13 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
-import { SIDEBAR_LINKS } from "@/app/constant/links";
-import Container from "../global/container";
+import { logout } from "@/store/auth/slice/authSlice";
+import { useAppDispatch, useAppSelector } from "@/store";
 
-export const DashboardSidebar = () => {
+export const DashboardSidebar = ({ onSearch }: { onSearch?: () => void }) => {
   const pathname = usePathname();
   const router = useRouter();
-  const { isMobile, setOpen, setOpenMobile } = useSidebar();
+  const { setOpenMobile } = useSidebar();
   const dispatch = useAppDispatch();
   const isLoggingOut = useAppSelector(
     (state) =>
@@ -43,104 +40,75 @@ export const DashboardSidebar = () => {
       router.replace("/auth/signin");
       router.refresh();
     } else if (logout.rejected.match(result) && !result.meta.condition) {
-      toast.error(
-        result.payload?.message ?? "Unable to log out. Please try again.",
-      );
-    }
-  };
-
-  const expandDesktopSidebar = () => {
-    if (!isMobile) setOpen(true);
-  };
-
-  const collapseDesktopSidebar = () => {
-    if (!isMobile) setOpen(false);
-  };
-
-  const handleBlur = (event: React.FocusEvent<HTMLElement>) => {
-    if (!event.currentTarget.contains(event.relatedTarget)) {
-      collapseDesktopSidebar();
+      toast.error(result.payload?.message ?? "Unable to log out.");
     }
   };
 
   return (
-    <Sidebar
-      collapsible="icon"
-      className="top-16 border-r border-border/50"
-      onPointerEnter={expandDesktopSidebar}
-      onPointerLeave={collapseDesktopSidebar}
-      onFocusCapture={expandDesktopSidebar}
-      onBlurCapture={handleBlur}
-    >
+    <Sidebar collapsible="icon" className="top-16 border-r-white/10">
       <SidebarHeader className="p-3">
-        <Container delay={0.2} className="h-max w-full">
-          <Button
-            variant="outline"
-            className="w-full justify-between px-3 text-muted-foreground hover:text-foreground bg-muted/30"
-          >
-            <span className="flex items-center gap-x-2 text-xs">
-              <SearchIcon className="size-4" />
-              <span className="group-data-[collapsible=icon]:hidden">
-                Search...
-              </span>
-            </span>
-            <kbd className="pointer-events-none group-data-[collapsible=icon]:hidden inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-background px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-              ⌘K
-            </kbd>
-          </Button>
-        </Container>
+        <Button
+          variant="outline"
+          className="w-full justify-start bg-white/[0.03] text-muted-foreground"
+          onClick={onSearch}
+        >
+          <Search className="size-4" />
+          <span className="group-data-[collapsible=icon]:hidden">Search</span>
+          <kbd className="ml-auto rounded border border-white/10 px-1.5 text-[10px] group-data-[collapsible=icon]:hidden">
+            ⌘K
+          </kbd>
+        </Button>
       </SidebarHeader>
-
       <SidebarContent className="px-2">
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {SIDEBAR_LINKS?.map((link) => {
-                const isActive = pathname === link.href;
-                const Icon = link.icon;
-
-                return (
-                  <SidebarMenuItem key={link.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                      tooltip={link.label}
-                    >
-                      <Container delay={0.3} className="h-max w-full">
+        {SIDEBAR_GROUPS.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.links.map((link) => {
+                  const active =
+                    link.href === "/app"
+                      ? pathname === link.href
+                      : pathname.startsWith(link.href);
+                  return (
+                    <SidebarMenuItem key={link.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={active}
+                        tooltip={link.label}
+                      >
                         <Link
                           href={link.href}
-                          className="flex items-center gap-x-3"
                           onClick={() => setOpenMobile(false)}
                         >
-                          {Icon && <Icon className="size-4" />}
+                          <link.icon className="size-4" />
                           <span>{link.label}</span>
                         </Link>
-                      </Container>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
-      <SidebarFooter className="mt-auto mb-2 p-2 border-t border-border/50">
+      <SidebarFooter className="border-t border-white/10 p-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              tooltip="Logout"
+              tooltip="Log out"
               onClick={handleLogout}
               disabled={isLoggingOut}
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              className="text-muted-foreground hover:text-red-300"
             >
-              <LogOut className="size-4 shrink-0" />
-              <span>{isLoggingOut ? "Logging out..." : "Logout"}</span>
+              <LogOut />
+              {isLoggingOut ? "Logging out…" : "Log out"}
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
-
-      <SidebarRail aria-label="Toggle dashboard sidebar" />
+      <SidebarRail />
     </Sidebar>
   );
 };
