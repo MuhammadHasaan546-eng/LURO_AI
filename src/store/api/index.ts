@@ -1,6 +1,13 @@
 import axios, { isAxiosError, type AxiosRequestConfig } from "axios";
 
+type ApiEnvelope<T> = {
+  success: true;
+  message: string;
+  data: T;
+};
+
 export type ApiError = {
+  success?: false;
   message: string;
   status?: number;
   fieldErrors?: Record<string, string[]>;
@@ -38,18 +45,32 @@ export const apiRequest = async <T>(
   config: AxiosRequestConfig = {},
 ): Promise<T> => {
   try {
-    const response = await apiClient.request<T>({
+    const response = await apiClient.request<T | ApiEnvelope<T>>({
       url,
       ...config,
       headers: { Accept: "application/json", ...config.headers },
     });
-    return response.data;
+    const body = response.data;
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "success" in body &&
+      body.success === true &&
+      "data" in body
+    ) {
+      const envelope = body as ApiEnvelope<T>;
+      if (typeof envelope.data === "object" && envelope.data !== null)
+        return { ...envelope.data, message: envelope.message } as T;
+      return envelope.data;
+    }
+    return body as T;
   } catch (error) {
     if (isAxiosError(error)) {
       const responseError = error.response?.data as
         | Partial<ApiError>
         | undefined;
       throw {
+        success: false,
         message:
           responseError?.message ??
           "The request could not be completed. Please try again.",
@@ -60,7 +81,10 @@ export const apiRequest = async <T>(
         redirectTo: responseError?.redirectTo,
       } satisfies ApiError;
     }
-    throw { message: "The request could not be completed." } satisfies ApiError;
+    throw {
+      success: false,
+      message: "The request could not be completed.",
+    } satisfies ApiError;
   }
 };
 

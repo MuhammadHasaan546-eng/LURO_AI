@@ -1,15 +1,22 @@
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import argon2 from "argon2";
+import { jwtVerify, SignJWT } from "jose";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 
 export const SESSION_COOKIE_NAME = "luro_session";
 export const CSRF_COOKIE_NAME = "luro_csrf";
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+const SESSION_TTL_MS = SESSION_TTL_SECONDS * 1000;
 const IDLE_TTL_MS = 24 * 60 * 60 * 1000;
 const TOKEN_BYTES = 32;
 const tokenPattern = /^[a-f0-9]{64}$/;
+const JWT_ISSUER = "luro-ai";
+const JWT_AUDIENCE = "luro-ai-web";
+const jwtSecret = new TextEncoder().encode(
+  env.AUTH_SECRET ?? "development-only-auth-key-change-before-production",
+);
 
 export const hashToken = (token: string) =>
   createHash("sha256").update(token).digest("hex");
@@ -21,6 +28,38 @@ export const hashIp = (value: string | null) =>
     : null;
 export const isValidToken = (token: string | undefined) =>
   Boolean(token && tokenPattern.test(token));
+
+export const generateSessionToken = (userId: string) =>
+  new SignJWT({ type: "access" })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setSubject(userId)
+    .setIssuer(JWT_ISSUER)
+    .setAudience(JWT_AUDIENCE)
+    .setJti(randomBytes(16).toString("hex"))
+    .setIssuedAt()
+    .setExpirationTime(`${SESSION_TTL_SECONDS}s`)
+    .sign(jwtSecret);
+
+export const verifySessionToken = async (token: string | undefined) => {
+  if (!token || token.length > 4096) return null;
+  try {
+    const { payload } = await jwtVerify(token, jwtSecret, {
+      algorithms: ["HS256"],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    });
+    if (
+      payload.type !== "access" ||
+      typeof payload.sub !== "string" ||
+      !payload.jti
+    )
+      return null;
+    return payload;
+  } catch {
+    return null;
+  }
+};
+
 export const hashPassword = (password: string) =>
   argon2.hash(password, {
     type: argon2.argon2id,
@@ -40,7 +79,7 @@ const cookieOptions = (expires: Date) => ({
 });
 
 export const createSession = async (userId: string, request?: Request) => {
-  const sessionToken = randomBytes(TOKEN_BYTES).toString("hex");
+  const sessionToken = await generateSessionToken(userId);
   const csrfToken = randomBytes(TOKEN_BYTES).toString("hex");
   const now = new Date();
   const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
@@ -75,13 +114,15 @@ export type CurrentSession = import("@/lib/db").CurrentSession;
 
 export const getCurrentSession = async (): Promise<CurrentSession | null> => {
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
-  if (!isValidToken(token)) return null;
+  const payload = await verifySessionToken(token);
+  if (!token || !payload) return null;
   const session = await db.session.findUnique({
-    where: { tokenHash: hashToken(token!) },
+    where: { tokenHash: hashToken(token) },
     include: true,
   });
   if (
     !session ||
+    session.userId !== payload.sub ||
     session.revokedAt ||
     session.expiresAt <= new Date() ||
     session.idleExpiresAt <= new Date()
@@ -107,7 +148,7 @@ export const requireCsrf = async (
 export const deleteCurrentSession = async () => {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE_NAME)?.value;
-  if (isValidToken(token))
+  if (await verifySessionToken(token))
     await db.session.updateMany({
       where: { tokenHash: hashToken(token!), revokedAt: null },
       data: { revokedAt: new Date() },

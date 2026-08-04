@@ -62,11 +62,15 @@ const clearClientAuthArtifacts = () => {
 };
 
 export const logoutRequest = async () => {
-  const response = await apiRequest<AuthResponse>("/api/auth/logout", {
-    method: "POST",
-  });
-  clearClientAuthArtifacts();
-  return response;
+  try {
+    return await apiRequest<AuthResponse>("/api/auth/logout", {
+      method: "POST",
+    });
+  } finally {
+    // Clear browser-side auth state even when the server session is already
+    // expired or the logout endpoint returns an authentication error.
+    clearClientAuthArtifacts();
+  }
 };
 
 export const forgotPasswordRequest = (email: string) =>

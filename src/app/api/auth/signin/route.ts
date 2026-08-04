@@ -1,5 +1,10 @@
-import { NextResponse } from "next/server";
 import { SignInSchema } from "@/signin-schema";
+import {
+  errorResponse,
+  internalErrorResponse,
+  successResponse,
+  validationErrorResponse,
+} from "@/lib/api-response";
 import { sendWelcomeBackEmail } from "@/lib/auth-notifications";
 import {
   audit,
@@ -11,33 +16,21 @@ import { db } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 const invalid = () =>
-  NextResponse.json(
-    {
-      code: "INVALID_CREDENTIALS",
-      message: "Incorrect username or password",
-    },
-    { status: 401 },
-  );
+  errorResponse("INVALID_CREDENTIALS", "Incorrect username or password", 401);
 
 const userNotFound = () =>
-  NextResponse.json(
-    {
-      code: "USER_NOT_FOUND",
-      message: "User does not exist. Please sign up.",
-    },
-    { status: 404 },
-  );
+  errorResponse("USER_NOT_FOUND", "User does not exist. Please sign up.", 404);
 
 async function signIn(request: Request) {
   const current = await getCurrentSession();
   if (current) {
-    return NextResponse.json(
+    return errorResponse(
+      "ALREADY_AUTHENTICATED",
+      "You are already logged in.",
+      409,
       {
-        code: "ALREADY_AUTHENTICATED",
-        message: "You are already logged in.",
-        redirectTo: "/app",
+        formErrors: [],
       },
-      { status: 409 },
     );
   }
 
@@ -54,24 +47,21 @@ async function signIn(request: Request) {
         (fieldErrors[detail.path.join(".")] ??= []).push(detail.message);
       else formErrors.push(detail.message);
     }
-    return NextResponse.json(
-      {
-        message: "Please correct the highlighted fields.",
-        fieldErrors,
-        formErrors,
-      },
-      { status: 400 },
-    );
+    return validationErrorResponse(fieldErrors, formErrors);
   }
+
   const { email, password } = validation.value as {
     email: string;
     password: string;
   };
   const limit = await checkRateLimit(request, "signin", email);
   if (!limit.allowed)
-    return NextResponse.json(
-      { message: "Too many attempts. Please try again later." },
-      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } },
+    return errorResponse(
+      "RATE_LIMITED",
+      "Too many attempts. Please try again later.",
+      429,
+      {},
+      { "Retry-After": String(limit.retryAfter) },
     );
   const user = await db.user.findUnique({
     where: { email },
@@ -120,23 +110,23 @@ async function signIn(request: Request) {
         claimedAt: loginNotificationClaimedAt,
       });
   }
-  return NextResponse.json({
-    user: {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
+  return successResponse(
+    {
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
     },
-  });
+    "Successfully signed in.",
+  );
 }
 
 export async function POST(request: Request) {
   try {
     return await signIn(request);
   } catch {
-    return NextResponse.json(
-      { message: "Unable to sign in. Please try again." },
-      { status: 500 },
-    );
+    return internalErrorResponse();
   }
 }

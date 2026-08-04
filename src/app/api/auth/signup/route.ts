@@ -1,18 +1,20 @@
-import { NextResponse } from "next/server";
-
 import { SignUpSchema } from "@/signup-schema";
+import {
+  errorResponse,
+  internalErrorResponse,
+  successResponse,
+  validationErrorResponse,
+} from "@/lib/api-response";
 import { audit, createSession, hashPassword, issueAuthToken } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { sendWelcomeEmail } from "@/lib/auth-notifications";
 
 const genericDuplicateResponse = () =>
-  NextResponse.json(
-    {
-      message:
-        "If an account can be created with these details, we will continue the setup.",
-    },
-    { status: 202 },
+  errorResponse(
+    "ACCOUNT_EXISTS",
+    "An account with this email already exists. Please sign in.",
+    409,
   );
 
 const parseBody = async (request: Request) => {
@@ -37,14 +39,7 @@ export async function POST(request: Request) {
         (fieldErrors[detail.path.join(".")] ??= []).push(detail.message);
       else formErrors.push(detail.message);
     }
-    return NextResponse.json(
-      {
-        message: "Please correct the highlighted fields.",
-        fieldErrors,
-        formErrors,
-      },
-      { status: 400 },
-    );
+    return validationErrorResponse(fieldErrors, formErrors);
   }
 
   const { firstName, lastName, email, password } = validation.value as {
@@ -117,13 +112,15 @@ export async function POST(request: Request) {
         }),
       }).catch(() => undefined);
     }
-    return NextResponse.json(
+    return successResponse(
       { user, emailVerificationRequired: true },
-      { status: 201 },
+      "Account created successfully. Please verify your email.",
+      201,
     );
   } catch (error) {
     if (error instanceof Error && /duplicate key|E11000/i.test(error.message))
       return genericDuplicateResponse();
-    throw error;
+    await audit("signup", "FAILURE", undefined, request).catch(() => undefined);
+    return internalErrorResponse();
   }
 }

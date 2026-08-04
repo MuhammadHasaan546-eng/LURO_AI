@@ -1,4 +1,4 @@
-import type { ClientSession } from "mongoose";
+import mongoose, { type ClientSession } from "mongoose";
 import { connectToDatabase, withMongoTransaction } from "@/lib/mongoose";
 import {
   AuditEventModel,
@@ -148,7 +148,12 @@ export const db = {
       const claimed = await UserModel.findOneAndUpdate(
         {
           id,
-          $or: [{ [field]: null }, { [field]: { $lt: before } }],
+          // sanitizeFilter protects user-supplied filters by escaping operators.
+          // This query is server-generated and intentionally uses $lt.
+          $or: [
+            { [field]: null },
+            { [field]: mongoose.trusted({ $lt: before }) },
+          ],
         },
         { $set: { [field]: now } },
         { new: false, runValidators: true },
@@ -427,10 +432,15 @@ export const db = {
       update: Partial<RateLimitBucket>;
     }) => {
       await connectToDatabase();
+      // MongoDB rejects an upsert when the same path appears in both $set and
+      // $setOnInsert. Only retain insert-only values in $setOnInsert.
+      const insertOnly = Object.fromEntries(
+        Object.entries(create).filter(([key]) => !(key in update)),
+      );
       return leanOne(
         RateLimitBucketModel.findOneAndUpdate(
           where,
-          { $set: update, $setOnInsert: create },
+          { $set: update, $setOnInsert: insertOnly },
           { upsert: true, new: true, runValidators: true },
         ),
       );
