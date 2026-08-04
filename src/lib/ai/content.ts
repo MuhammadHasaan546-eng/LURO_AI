@@ -22,7 +22,9 @@ export const createSocial = async (userId: string, input: SocialInput) => {
     userId,
     ...input,
     content: result.content,
-    ...result,
+    model: result.model,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
   });
 };
 
@@ -45,7 +47,9 @@ export const createEmail = async (userId: string, input: EmailInput) => {
     ...input,
     subject: parsed.subject.slice(0, 300),
     body: parsed.body,
-    ...result,
+    model: result.model,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
   });
 };
 
@@ -68,6 +72,8 @@ export const createTranslation = async (
     targetLanguage: input.targetLanguage,
     sourceText: input.text,
     translatedText: result.content,
-    ...result,
+    model: result.model,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
   });
 };
