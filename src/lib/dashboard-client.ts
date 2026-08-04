@@ -88,7 +88,10 @@ export function useApiData<T>(url: string, initial: T) {
       setLoading(false);
     }
   }, [url]);
-  useEffect(() => void load(), [load]);
+  useEffect(() => {
+    const task = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(task);
+  }, [load]);
   return { data, setData, loading, error, retry: load };
 }
 

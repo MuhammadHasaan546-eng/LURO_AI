@@ -24,9 +24,6 @@ function CommandPalette({ open, close }: { open: boolean; close: () => void }) {
       ),
     [query],
   );
-  useEffect(() => {
-    if (!open) setQuery("");
-  }, [open]);
   if (!open) return null;
   return (
     <div
@@ -60,6 +57,7 @@ function CommandPalette({ open, close }: { open: boolean; close: () => void }) {
               className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm hover:bg-white/5"
               onClick={() => {
                 router.push(item.href);
+                setQuery("");
                 close();
               }}
             >

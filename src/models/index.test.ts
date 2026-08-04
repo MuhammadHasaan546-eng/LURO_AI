@@ -54,14 +54,35 @@ describe("Mongoose model constraints", () => {
     expect(challenge.toJSON()).not.toHaveProperty("codeVerifier");
   });
 
-  it("defines integrity and expiry indexes", () => {
+  it("defines identity, session, and expiry indexes", () => {
     expect(UserModel.schema.indexes()).toEqual(
       expect.arrayContaining([
         [{ email: 1 }, expect.objectContaining({ unique: true })],
       ]),
     );
+    expect(ProviderIdentityModel.schema.indexes()).toEqual(
+      expect.arrayContaining([
+        [
+          { provider: 1, providerSubject: 1 },
+          expect.objectContaining({ unique: true }),
+        ],
+      ]),
+    );
+    expect(SessionModel.schema.indexes()).toEqual(
+      expect.arrayContaining([
+        [{ tokenHash: 1 }, expect.objectContaining({ unique: true })],
+        [{ userId: 1, revokedAt: 1, expiresAt: -1 }, expect.any(Object)],
+      ]),
+    );
     expect(AuthTokenModel.schema.indexes()).toEqual(
       expect.arrayContaining([
+        [{ tokenHash: 1 }, expect.objectContaining({ unique: true })],
+        [{ expiresAt: 1 }, expect.objectContaining({ expireAfterSeconds: 0 })],
+      ]),
+    );
+    expect(OAuthChallengeModel.schema.indexes()).toEqual(
+      expect.arrayContaining([
+        [{ stateHash: 1 }, expect.objectContaining({ unique: true })],
         [{ expiresAt: 1 }, expect.objectContaining({ expireAfterSeconds: 0 })],
       ]),
     );
