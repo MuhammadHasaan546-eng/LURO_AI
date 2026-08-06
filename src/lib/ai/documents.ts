@@ -1,6 +1,7 @@
 import "server-only";
 
-import { PDFParse } from "pdf-parse";
+// @ts-ignore
+import PDFParser from "pdf2json";
 import { env } from "@/lib/env";
 import { completeText, embedTexts } from "@/lib/ai/generation";
 import { cosineSimilarity } from "@/lib/ai/vector";
@@ -24,6 +25,44 @@ const splitText = (text: string, size = 1_500, overlap = 200) => {
   return chunks.filter(Boolean).slice(0, 500);
 };
 
+// Helper function to extract text using pdf2json (No worker issues)
+const parsePdfBuffer = async (buffer: Buffer): Promise<{ text: string; pageCount: number }> => {
+  return new Promise((resolve, reject) => {
+    // 🛠️ Fixed constructor line
+    // @ts-ignore
+    const pdfParser = new PDFParser();
+    
+    pdfParser.on("pdfParser_dataError", (errData: any) => {
+      reject(new Error(errData.parserError || "Failed to parse PDF"));
+    });
+
+    pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
+      try {
+        let extractedText = "";
+        const pages = pdfData.Pages || [];
+        
+        for (const page of pages) {
+          const texts = page.Texts || [];
+          for (const textObj of texts) {
+            const decoded = decodeURIComponent(textObj.R?.[0]?.T || "");
+            extractedText += decoded + " ";
+          }
+          extractedText += "\n";
+        }
+
+        resolve({
+          text: extractedText.trim(),
+          pageCount: pages.length || 1,
+        });
+      } catch (e) {
+        reject(e);
+      }
+    });
+
+    pdfParser.parseBuffer(buffer);
+  });
+};
+
 export const ingestPdf = async (userId: string, file: File) => {
   if (
     file.type !== "application/pdf" ||
@@ -36,18 +75,21 @@ export const ingestPdf = async (userId: string, file: File) => {
       "FILE_TOO_LARGE",
       "PDF exceeds the configured file size limit.",
     );
-  const parser = new PDFParse({ data: Buffer.from(await file.arrayBuffer()) });
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+
   try {
-    const result = await parser.getText();
-    const pageCount = result.pages.length;
+    const { text, pageCount } = await parsePdfBuffer(buffer);
+    
     await assertUsageAvailable(userId, "pages", pageCount);
-    const chunks = splitText(result.text);
+    const chunks = splitText(text);
     if (!chunks.length)
       throw new HttpError(
         422,
         "PDF_TEXT_EMPTY",
         "No extractable text was found.",
       );
+
     await connectToDatabase();
     const document = await DocumentModel.create({
       userId,
@@ -57,12 +99,14 @@ export const ingestPdf = async (userId: string, file: File) => {
       chunkCount: chunks.length,
       byteSize: file.size,
     });
+
     try {
       const embeddings: number[][] = [];
       for (let offset = 0; offset < chunks.length; offset += 50)
         embeddings.push(
           ...(await embedTexts(chunks.slice(offset, offset + 50))),
         );
+
       await DocumentChunkModel.insertMany(
         chunks.map((content, index) => ({
           userId,
@@ -76,16 +120,19 @@ export const ingestPdf = async (userId: string, file: File) => {
           embedding: embeddings[index],
         })),
       );
+
       document.status = "ready";
       await document.save();
+
       await recordUsage({
         userId,
         feature: "pdf",
         quantity: pageCount,
         unit: "pages",
-        model: env.OPENAI_EMBEDDING_MODEL,
+        model: env.OPENROUTER_EMBEDDING_MODEL,
         resourceId: document.id,
       });
+
       return document;
     } catch (error) {
       document.status = "failed";
@@ -93,8 +140,8 @@ export const ingestPdf = async (userId: string, file: File) => {
       await document.save();
       throw error;
     }
-  } finally {
-    await parser.destroy();
+  } catch (error) {
+    throw new HttpError(400, "INVALID_PDF", "Could not read or parse the PDF file.");
   }
 };
 
@@ -109,11 +156,14 @@ export const askDocument = async (
     userId,
     status: "ready",
   }).lean();
+
   if (!document) throw new HttpError(404, "NOT_FOUND", "Document not found.");
+
   const [queryEmbedding] = await embedTexts([question]);
   const chunks = await DocumentChunkModel.find({ userId, documentId })
     .select("+embedding")
     .lean();
+
   const ranked = chunks
     .map((chunk) => ({
       chunk,
@@ -121,12 +171,14 @@ export const askDocument = async (
     }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 6);
+
   const context = ranked
     .map(
       ({ chunk }, index) =>
         `[${index + 1}] Page ${chunk.page}\n${chunk.content}`,
     )
     .join("\n\n");
+
   const result = await completeText({
     userId,
     feature: "pdf",
@@ -135,6 +187,7 @@ export const askDocument = async (
     prompt: `Excerpts:\n${context}\n\nQuestion: ${question}`,
     resourceId: documentId,
   });
+
   const citations = ranked.map(({ chunk, score }) => ({
     chunkId: chunk.id,
     chunkIndex: chunk.chunkIndex,
@@ -142,6 +195,7 @@ export const askDocument = async (
     excerpt: chunk.content.slice(0, 500),
     score,
   }));
+
   return DocumentQuestionModel.create({
     userId,
     documentId,

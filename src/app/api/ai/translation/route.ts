@@ -32,8 +32,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-      console.log("ERROR ", request.body)
-
   try {
     const session = await requireAiSession(request);
     await enforceAiRateLimit(session.userId, "translation");

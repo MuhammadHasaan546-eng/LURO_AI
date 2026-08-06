@@ -44,6 +44,7 @@ export async function POST(request: Request) {
     const document = await ingestPdf(session.userId, file);
     return successResponse(document, "Document processed.", 201);
   } catch (error) {
+    console.error("DETAILED PDF UPLOAD ERROR:", error);
     return handleRouteError(error);
   }
 }
