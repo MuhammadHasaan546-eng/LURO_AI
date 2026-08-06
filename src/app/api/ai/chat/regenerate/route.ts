@@ -20,21 +20,28 @@ export async function POST(request: Request) {
   try {
     const session = await requireAiSession(request);
     await enforceAiRateLimit(session.userId, "chat-regenerate");
+    
     const input = await parseBody<RegenerateChatInput>(
       request,
       regenerateChatSchema,
     );
+    
     await connectToDatabase();
+    
     const chat = await ChatModel.findOne({
       id: input.chatId,
       userId: session.userId,
     });
+    
     if (!chat) throw new HttpError(404, "NOT_FOUND", "Chat not found.");
+    
     const messageIndex = chat.messages.findIndex(
       (message: { id: string }) => message.id === input.messageId,
     );
+    
     if (messageIndex < 0 || chat.messages[messageIndex].role !== "assistant")
       throw new HttpError(404, "NOT_FOUND", "Assistant message not found.");
+      
     const context = chat.messages
       .slice(0, messageIndex)
       .slice(-20)
@@ -43,6 +50,7 @@ export async function POST(request: Request) {
           `${message.role}: ${message.content}`,
       )
       .join("\n");
+      
     const result = await completeText({
       userId: session.userId,
       feature: "chat",
@@ -51,6 +59,7 @@ export async function POST(request: Request) {
       prompt: context,
       resourceId: chat.id,
     });
+    
     Object.assign(chat.messages[messageIndex], {
       content: result.content,
       model: result.model,
@@ -59,7 +68,9 @@ export async function POST(request: Request) {
       status: "complete",
       createdAt: new Date(),
     });
+    
     await chat.save();
+    
     return successResponse(
       chat.messages[messageIndex],
       "Response regenerated.",

@@ -1,7 +1,6 @@
 import "server-only";
 
 import { env } from "@/lib/env";
-import { getOpenAI } from "@/lib/ai/providers";
 import {
   assertUsageAvailable,
   recordUsage,
@@ -25,33 +24,58 @@ export const completeText = async (input: {
   maxOutputTokens?: number;
 }): Promise<CompletionResult> => {
   await assertUsageAvailable(input.userId, "tokens", 1);
-  const client = getOpenAI();
-  const response = await client.chat.completions.create({
-    model: env.OPENAI_CHAT_MODEL,
-    messages: [
-      { role: "system", content: input.system },
-      { role: "user", content: input.prompt },
-    ],
-    max_completion_tokens: Math.min(input.maxOutputTokens ?? 2_000, 4_000),
+
+  const response = await fetch(`${env.OPENROUTER_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${env.OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+      "X-Title": "Aipass AI Saas",
+    },
+    body: JSON.stringify({
+      model: env.OPENROUTER_CHAT_MODEL,
+      messages: [
+        { role: "system", content: input.system },
+        { role: "user", content: input.prompt },
+      ],
+      max_tokens: Math.min(input.maxOutputTokens ?? 2_000, 4_000),
+    }),
   });
-  const content = response.choices[0]?.message.content?.trim();
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    console.error("OpenRouter Chat Error:", errorData);
+    throw new HttpError(
+      502,
+      "PROVIDER_ERROR",
+      "AI provider returned an error.",
+    );
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content?.trim();
+
   if (!content)
     throw new HttpError(
       502,
       "EMPTY_PROVIDER_RESPONSE",
       "AI provider returned no content.",
     );
-  const inputTokens = response.usage?.prompt_tokens ?? 0;
-  const outputTokens = response.usage?.completion_tokens ?? 0;
+
+  const inputTokens = data.usage?.prompt_tokens ?? 0;
+  const outputTokens = data.usage?.completion_tokens ?? 0;
+
   await recordUsage({
     userId: input.userId,
     feature: input.feature,
     quantity: inputTokens + outputTokens,
     unit: "tokens",
-    model: response.model,
+    model: data.model || env.OPENROUTER_CHAT_MODEL,
     resourceId: input.resourceId,
   });
-  return { content, inputTokens, outputTokens, model: response.model };
+
+  return { content, inputTokens, outputTokens, model: data.model || env.OPENROUTER_CHAT_MODEL };
 };
 
 export const parseJsonObject = <T>(content: string): T => {
@@ -79,9 +103,29 @@ export const embedTexts = async (texts: string[]) => {
       "INVALID_EMBEDDING_BATCH",
       "Invalid embedding batch.",
     );
-  const response = await getOpenAI().embeddings.create({
-    model: env.OPENAI_EMBEDDING_MODEL,
-    input: texts,
+
+  const response = await fetch(`${env.OPENROUTER_BASE_URL}/embeddings`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${env.OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: env.OPENROUTER_EMBEDDING_MODEL,
+      input: texts,
+    }),
   });
-  return response.data.map((item) => item.embedding);
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    console.error("OpenRouter Embedding Error:", errorData);
+    throw new HttpError(
+      502,
+      "EMBEDDING_PROVIDER_ERROR",
+      "Embedding provider returned an error.",
+    );
+  }
+
+  const data = await response.json();
+  return data.data.map((item: { embedding: number[] }) => item.embedding);
 };

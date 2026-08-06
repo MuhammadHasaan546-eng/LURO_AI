@@ -57,22 +57,32 @@ const environmentSchema = Joi.object({
     .uri({ scheme: ["https"] })
     .max(2048),
   EMAIL_WEBHOOK_SECRET: Joi.string().min(16).max(2048),
-  OPENAI_API_KEY: Joi.string().min(1).max(2048),
-  OPENAI_BASE_URL: Joi.string()
+  
+  // OpenRouter Configuration
+  OPENROUTER_API_KEY: Joi.string().min(1).max(2048),
+  OPENROUTER_BASE_URL: Joi.string()
     .uri({ scheme: ["https"] })
     .max(2048)
-    .default("https://api.openai.com/v1"),
-  OPENAI_CHAT_MODEL: Joi.string().trim().min(1).max(100).default("gpt-4o-mini"),
-  OPENAI_IMAGE_MODEL: Joi.string()
+    .default("https://openrouter.ai/api/v1"),
+  OPENROUTER_CHAT_MODEL: Joi.string().trim().min(1).max(100).default("openai/gpt-oss-20b:free"),
+  OPENROUTER_EMBEDDING_MODEL: Joi.string()
     .trim()
     .min(1)
     .max(100)
-    .default("gpt-image-1"),
-  OPENAI_EMBEDDING_MODEL: Joi.string()
+    .default("openai/text-embedding-3-small"),
+
+  // Pollinations Configuration
+  POLLINATIONS_API_KEY: Joi.string().allow("").max(2048).default(""),
+  POLLINATIONS_BASE_URL: Joi.string()
+    .uri({ scheme: ["https"] })
+    .max(2048)
+    .default("https://gen.pollinations.ai/image"),
+  POLLINATIONS_IMAGE_MODEL: Joi.string()
     .trim()
     .min(1)
     .max(100)
-    .default("text-embedding-3-small"),
+    .default("dreamshaper"),
+
   CLOUDINARY_CLOUD_NAME: Joi.string().trim().min(1).max(255),
   CLOUDINARY_API_KEY: Joi.string().trim().min(1).max(255),
   CLOUDINARY_API_SECRET: Joi.string().min(1).max(2048),
@@ -243,11 +253,13 @@ export const env = value as {
   SMTP_PASS?: string;
   EMAIL_WEBHOOK_URL?: string;
   EMAIL_WEBHOOK_SECRET?: string;
-  OPENAI_API_KEY?: string;
-  OPENAI_BASE_URL: string;
-  OPENAI_CHAT_MODEL: string;
-  OPENAI_IMAGE_MODEL: string;
-  OPENAI_EMBEDDING_MODEL: string;
+  OPENROUTER_API_KEY?: string;
+  OPENROUTER_BASE_URL: string;
+  OPENROUTER_CHAT_MODEL: string;
+  OPENROUTER_EMBEDDING_MODEL: string;
+  POLLINATIONS_API_KEY?: string;
+  POLLINATIONS_BASE_URL: string;
+  POLLINATIONS_IMAGE_MODEL: string;
   CLOUDINARY_CLOUD_NAME?: string;
   CLOUDINARY_API_KEY?: string;
   CLOUDINARY_API_SECRET?: string;
