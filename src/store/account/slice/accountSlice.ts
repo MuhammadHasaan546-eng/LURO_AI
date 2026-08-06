@@ -54,7 +54,7 @@ const accountSlice = createSlice({
         else state.status = "loading";
       })
       .addCase(fetchAccount.fulfilled, (state, action) => {
-        state.data = action.payload;
+        state.data = action.payload ?? null;
         state.status = "succeeded";
         state.isRefreshing = false;
         state.currentRequestId = null;
@@ -64,7 +64,13 @@ const accountSlice = createSlice({
         if (action.meta.condition) return;
         state.status = state.data ? "succeeded" : "failed";
         state.isRefreshing = false;
-        state.error = action.payload?.message ?? "Unable to load your account.";
+        
+        // Safe error payload handling & setting state.error properly
+        const payload = action.payload as { message?: string } | undefined;
+        const errorMessage = payload?.message ?? action.error?.message ?? "Unable to load your account.";
+        
+        state.error = errorMessage;
+        state.mutationError = errorMessage;
         state.currentRequestId = null;
       })
       .addCase(mutateAccount.pending, (state, action) => {
@@ -75,13 +81,16 @@ const accountSlice = createSlice({
       })
       .addCase(mutateAccount.fulfilled, (state, action) => {
         state.mutationStatus = "succeeded";
-        state.mutationMessage = action.payload.message;
+        state.mutationMessage = action.payload?.message ?? "Success";
       })
       .addCase(mutateAccount.rejected, (state, action) => {
         if (action.meta.condition) return;
         state.mutationStatus = "failed";
+        
+        // Safe error payload handling
+        const payload = action.payload as { message?: string } | undefined;
         state.mutationError =
-          action.payload?.message ?? "Unable to update your account.";
+          payload?.message ?? action.error?.message ?? "Unable to update your account.";
       });
   },
 });

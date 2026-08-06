@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { LoaderCircle, AlertCircle, RefreshCw } from "lucide-react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { resendVerification } from "@/store/auth/slice/authSlice";
@@ -24,13 +25,14 @@ export default function AccountPanel() {
   const action = async (payload: Parameters<typeof mutateAccount>[0]) => {
     const result = await dispatch(mutateAccount(payload));
     if (mutateAccount.fulfilled.match(result)) {
-      toast.success(result.payload.message);
-      if (result.payload.kind === "deleteAccount") location.href = "/";
+      toast.success(result.payload?.message ?? "Success!");
+      if (result.payload?.kind === "deleteAccount") location.href = "/";
       else void dispatch(fetchAccount({ force: true }));
       return true;
     }
     if (mutateAccount.rejected.match(result) && !result.meta.condition) {
-      toast.error(result.payload?.message ?? "Unable to update your account.");
+      const payloadError = result.payload as { message?: string } | undefined;
+      toast.error(payloadError?.message ?? result.error?.message ?? "Unable to update your account.");
     }
     return false;
   };
@@ -42,11 +44,11 @@ export default function AccountPanel() {
         {[1, 2, 3].map((item) => (
           <div
             key={item}
-            className="rounded-2xl border border-white/10 bg-white/5 p-5"
+            className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 space-y-4"
           >
-            <Skeleton className="h-6 w-40" />
-            <Skeleton className="mt-4 h-12 w-full" />
-            <Skeleton className="mt-3 h-12 w-2/3" />
+            <Skeleton className="h-6 w-40 bg-white/10" />
+            <Skeleton className="h-12 w-full bg-white/10" />
+            <Skeleton className="h-12 w-2/3 bg-white/10" />
           </div>
         ))}
       </div>
@@ -57,16 +59,23 @@ export default function AccountPanel() {
     return (
       <div
         role="alert"
-        className="rounded-2xl border border-red-500/30 bg-red-500/10 p-8 text-center"
+        className="rounded-2xl border border-red-500/30 bg-red-500/10 p-8 text-center space-y-4 backdrop-blur"
       >
-        <p className="text-red-200">
-          {error ?? "Unable to load your account."}
-        </p>
+        <div className="flex justify-center text-red-400">
+          <AlertCircle className="size-8" />
+        </div>
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold text-red-200">The request could not be completed</h3>
+          <p className="text-sm text-red-300/80 max-w-md mx-auto">
+            {error ?? "Unable to load your account details from the server."}
+          </p>
+        </div>
         <button
-          onClick={() => dispatch(fetchAccount({ force: true }))}
-          className="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-medium text-black"
+          onClick={() => void dispatch(fetchAccount({ force: true }))}
+          className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-medium text-black hover:bg-white/90 transition-all shadow-lg"
         >
-          Retry
+          <RefreshCw className="size-4" />
+          Retry Request
         </button>
       </div>
     );
@@ -74,7 +83,7 @@ export default function AccountPanel() {
 
   if (!data) {
     return (
-      <div className="rounded-2xl border border-white/10 p-8 text-center text-gray-400">
+      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-8 text-center text-gray-400 backdrop-blur">
         No account data is available.
       </div>
     );
@@ -91,19 +100,19 @@ export default function AccountPanel() {
       {error && (
         <div
           role="alert"
-          className="rounded-xl border border-amber-400/25 bg-amber-400/10 p-3 text-sm text-amber-100"
+          className="flex items-center justify-between rounded-xl border border-amber-400/25 bg-amber-400/10 p-4 text-sm text-amber-100"
         >
-          {error}{" "}
+          <span>{error}</span>
           <button
-            className="ml-2 underline"
-            onClick={() => dispatch(fetchAccount({ force: true }))}
+            className="underline font-semibold hover:text-amber-200 ml-4 shrink-0"
+            onClick={() => void dispatch(fetchAccount({ force: true }))}
           >
             Retry
           </button>
         </div>
       )}
       {!data.user.emailVerified && (
-        <section className="rounded-2xl border border-amber-400/25 bg-amber-400/10 p-5">
+        <section className="rounded-2xl border border-amber-400/25 bg-amber-400/10 p-5 backdrop-blur">
           <h2 className="font-medium text-amber-100">Verify your email</h2>
           <p className="mt-1 text-sm text-amber-100/70">
             Verification protects recovery and sensitive account changes.
@@ -113,20 +122,22 @@ export default function AccountPanel() {
             onClick={async () => {
               const result = await dispatch(resendVerification());
               if (resendVerification.fulfilled.match(result))
-                toast.success(result.payload.message);
+                toast.success(result.payload?.message ?? "Verification email sent!");
               else if (
                 resendVerification.rejected.match(result) &&
                 !result.meta.condition
-              )
-                toast.error(result.payload?.message);
+              ) {
+                const errPayload = result.payload as { message?: string } | undefined;
+                toast.error(errPayload?.message ?? "Failed to send verification.");
+              }
             }}
-            className="mt-3 rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-black disabled:opacity-50"
+            className="mt-3 rounded-xl bg-amber-100 px-4 py-2 text-sm font-medium text-black disabled:opacity-50 hover:bg-white transition-all"
           >
             {authLoading ? "Sending…" : "Resend verification"}
           </button>
         </section>
       )}
-      <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
+      <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 backdrop-blur">
         <h2 className="text-lg font-medium">Profile</h2>
         <form
           className="mt-4 grid gap-3 sm:grid-cols-2"
@@ -144,42 +155,42 @@ export default function AccountPanel() {
             name="firstName"
             defaultValue={data.user.firstName}
             aria-label="First name"
-            className="rounded-xl border border-white/15 bg-black/20 px-4 py-3"
+            className="rounded-xl border border-white/15 bg-black/20 px-4 py-3 text-foreground"
           />
           <input
             name="lastName"
             defaultValue={data.user.lastName}
             aria-label="Last name"
-            className="rounded-xl border border-white/15 bg-black/20 px-4 py-3"
+            className="rounded-xl border border-white/15 bg-black/20 px-4 py-3 text-foreground"
           />
-          <div className="text-sm text-gray-400 sm:col-span-2">
+          <div className="text-sm text-muted-foreground sm:col-span-2 pt-1">
             {data.user.email}
           </div>
           <button
             disabled={busy}
-            className="w-fit rounded-lg bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-50"
+            className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-50 hover:bg-white/90 transition-all"
           >
             {busy && mutationKind === "profile" ? "Saving…" : "Save profile"}
           </button>
         </form>
       </section>
-      <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
+      <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 backdrop-blur">
         <h2 className="text-lg font-medium">Sign-in methods</h2>
         <div className="mt-4 space-y-3">
           {data.user.hasPassword && (
-            <div className="rounded-xl border border-white/10 p-3 text-sm">
+            <div className="rounded-xl border border-white/10 p-3 text-sm bg-white/[0.01]">
               Email and password
             </div>
           )}
           {!data.user.hasPassword && data.user.identities.length === 0 && (
-            <p className="rounded-xl border border-dashed border-white/15 p-4 text-sm text-gray-400">
+            <p className="rounded-xl border border-dashed border-white/15 p-4 text-sm text-muted-foreground">
               No sign-in methods are available.
             </p>
           )}
           {data.user.identities.map((identity) => (
             <div
               key={identity.id}
-              className="flex items-center justify-between rounded-xl border border-white/10 p-3 text-sm"
+              className="flex items-center justify-between rounded-xl border border-white/10 p-3 text-sm bg-white/[0.01]"
             >
               <span className="capitalize">
                 {identity.provider.toLowerCase()}{" "}
@@ -188,9 +199,9 @@ export default function AccountPanel() {
               <button
                 disabled={busy}
                 onClick={() =>
-                  action({ kind: "removeProvider", id: identity.id })
+                  void action({ kind: "removeProvider", id: identity.id })
                 }
-                className="text-red-300 disabled:opacity-50"
+                className="text-red-300 hover:text-red-200 disabled:opacity-50 font-medium"
               >
                 Remove
               </button>
@@ -200,19 +211,19 @@ export default function AccountPanel() {
         <div className="mt-4 flex gap-2">
           <Link
             href="/api/auth/oauth/google?returnTo=/account"
-            className="rounded-lg border border-white/15 px-3 py-2 text-sm"
+            className="rounded-xl border border-white/15 px-4 py-2 text-sm hover:bg-white/5 transition-all"
           >
             Link Google
           </Link>
           <Link
             href="/api/auth/oauth/apple?returnTo=/account"
-            className="rounded-lg border border-white/15 px-3 py-2 text-sm"
+            className="rounded-xl border border-white/15 px-4 py-2 text-sm hover:bg-white/5 transition-all"
           >
             Link Apple
           </Link>
         </div>
         <form
-          className="mt-5 grid gap-3"
+          className="mt-6 grid gap-3 pt-4 border-t border-white/10"
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
@@ -233,7 +244,7 @@ export default function AccountPanel() {
               type="password"
               autoComplete="current-password"
               placeholder="Current password"
-              className="rounded-xl border border-white/15 bg-black/20 px-4 py-3"
+              className="rounded-xl border border-white/15 bg-black/20 px-4 py-3 text-foreground"
             />
           )}
           <input
@@ -241,18 +252,18 @@ export default function AccountPanel() {
             type="password"
             autoComplete="new-password"
             placeholder="New password (12+ characters)"
-            className="rounded-xl border border-white/15 bg-black/20 px-4 py-3"
+            className="rounded-xl border border-white/15 bg-black/20 px-4 py-3 text-foreground"
           />
           <input
             name="confirmPassword"
             type="password"
             autoComplete="new-password"
             placeholder="Confirm new password"
-            className="rounded-xl border border-white/15 bg-black/20 px-4 py-3"
+            className="rounded-xl border border-white/15 bg-black/20 px-4 py-3 text-foreground"
           />
           <button
             disabled={busy}
-            className="w-fit rounded-lg bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-50"
+            className="w-fit rounded-xl bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-50 hover:bg-white/90 transition-all mt-1"
           >
             {busy && mutationKind === "password"
               ? "Updating…"
@@ -260,35 +271,35 @@ export default function AccountPanel() {
           </button>
         </form>
       </section>
-      <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
+      <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 backdrop-blur">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-medium">Active sessions</h2>
           <button
             disabled={busy}
-            onClick={() => action({ kind: "revokeOtherSessions" })}
-            className="text-sm text-violet-300 disabled:opacity-50"
+            onClick={() => void action({ kind: "revokeOtherSessions" })}
+            className="text-sm text-violet-300 hover:text-violet-200 disabled:opacity-50 font-medium"
           >
             Revoke all others
           </button>
         </div>
         <div className="mt-4 space-y-3">
           {data.sessions.length === 0 && (
-            <p className="rounded-xl border border-dashed border-white/15 p-4 text-sm text-gray-400">
+            <p className="rounded-xl border border-dashed border-white/15 p-4 text-sm text-muted-foreground">
               No active sessions were found.
             </p>
           )}
           {data.sessions.map((session) => (
             <div
               key={session.id}
-              className="flex items-center justify-between rounded-xl border border-white/10 p-3 text-sm"
+              className="flex items-center justify-between rounded-xl border border-white/10 p-3 text-sm bg-white/[0.01]"
             >
               <div>
-                <p>
+                <p className="font-medium">
                   {session.current
                     ? "This device"
                     : (session.userAgent ?? "Unknown device")}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   Started {new Date(session.createdAt).toLocaleString()}
                 </p>
               </div>
@@ -296,9 +307,9 @@ export default function AccountPanel() {
                 <button
                   disabled={busy}
                   onClick={() =>
-                    action({ kind: "revokeSession", id: session.id })
+                    void action({ kind: "revokeSession", id: session.id })
                   }
-                  className="text-red-300 disabled:opacity-50"
+                  className="text-red-300 hover:text-red-200 disabled:opacity-50 font-medium"
                 >
                   Revoke
                 </button>
@@ -307,9 +318,9 @@ export default function AccountPanel() {
           ))}
         </div>
       </section>
-      <section className="rounded-2xl border border-red-500/20 bg-red-500/5 p-5">
+      <section className="rounded-2xl border border-red-500/20 bg-red-500/5 p-5 backdrop-blur">
         <h2 className="font-medium text-red-200">Delete account</h2>
-        <p className="mt-1 text-sm text-gray-400">
+        <p className="mt-1 text-sm text-muted-foreground">
           Permanently deletes your account and authentication data.
         </p>
         <button
@@ -320,7 +331,7 @@ export default function AccountPanel() {
             )
               void action({ kind: "deleteAccount" });
           }}
-          className="mt-3 rounded-lg border border-red-400/30 px-3 py-2 text-sm text-red-200 disabled:opacity-50"
+          className="mt-3 rounded-xl border border-red-400/30 px-4 py-2 text-sm text-red-200 disabled:opacity-50 hover:bg-red-500/10 transition-all font-medium"
         >
           {busy && mutationKind === "deleteAccount"
             ? "Deleting…"
