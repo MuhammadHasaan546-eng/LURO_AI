@@ -8,7 +8,9 @@ let stripeClient: Stripe | undefined;
 let cloudinaryConfigured = false;
 
 export class ProviderConfigurationError extends Error {
-  constructor(public readonly provider: "Cloudinary" | "Stripe") {
+  constructor(
+    public readonly provider: "Cloudinary" | "Stripe" | "Pollinations"
+  ) {
     super(`${provider} is not configured.`);
     this.name = "ProviderConfigurationError";
   }
@@ -19,8 +21,9 @@ export const getCloudinary = () => {
     !env.CLOUDINARY_CLOUD_NAME ||
     !env.CLOUDINARY_API_KEY ||
     !env.CLOUDINARY_API_SECRET
-  )
+  ) {
     throw new ProviderConfigurationError("Cloudinary");
+  }
   if (!cloudinaryConfigured) {
     cloudinary.config({
       cloud_name: env.CLOUDINARY_CLOUD_NAME,
@@ -40,4 +43,27 @@ export const getStripe = () => {
     maxNetworkRetries: 2,
   });
   return stripeClient;
+};
+
+// Pollinations AI URL Generator (Fixed to public free endpoint)
+// `@/lib/ai/providers.ts`
+
+export const getPollinationsImageUrl = (
+  prompt: string,
+  model?: string,
+  size?: string
+) => {
+  const selectedModel = model || env.POLLINATIONS_IMAGE_MODEL || "flux";
+  
+  // DIRECT FREE PUBLIC ENDPOINT (env variable override ignore kar diya hai)
+  const baseUrl = "https://image.pollinations.ai/prompt";
+  const [width, height] = (size || "1024x1024").split("x");
+
+  const pollinationsUrl = new URL(`${baseUrl}/${encodeURIComponent(prompt)}`);
+  pollinationsUrl.searchParams.append("model", selectedModel);
+  pollinationsUrl.searchParams.append("width", width || "1024");
+  pollinationsUrl.searchParams.append("height", height || "1024");
+  pollinationsUrl.searchParams.append("nologo", "true");
+
+  return pollinationsUrl.toString();
 };
