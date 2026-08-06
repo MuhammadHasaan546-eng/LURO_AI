@@ -38,12 +38,14 @@ type HistoryItem = {
   status?: string;
   pageCount?: number;
 };
+
 type Tab = {
   key: string;
   label: string;
   endpoint: string;
   icon: typeof FileText;
 };
+
 const tabs: Tab[] = [
   {
     key: "social",
@@ -76,17 +78,20 @@ const tabs: Tab[] = [
     icon: FileText,
   },
 ];
+
 export default function HistoryPage() {
   const [tab, setTab] = useState(tabs[0]);
   const [query, setQuery] = useState("");
   const data = useApiData<HistoryItem[]>(tab.endpoint, []);
-  const items = useMemo(
-    () =>
-      data.data.filter((item) =>
-        JSON.stringify(item).toLowerCase().includes(query.toLowerCase()),
-      ),
-    [data.data, query],
-  );
+
+  // Ensure data.data is always treated as an array to prevent crashes
+  const items = useMemo(() => {
+    const list = Array.isArray(data.data) ? data.data : [];
+    return list.filter((item) =>
+      JSON.stringify(item).toLowerCase().includes(query.toLowerCase()),
+    );
+  }, [data.data, query]);
+
   const getText = (item: HistoryItem) =>
     item.content ??
     item.body ??
@@ -94,6 +99,7 @@ export default function HistoryPage() {
     item.prompt ??
     item.name ??
     "";
+
   return (
     <DashboardPage>
       <PageHeader
@@ -106,7 +112,11 @@ export default function HistoryPage() {
             <button
               key={item.key}
               onClick={() => setTab(item)}
-              className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm ${tab.key === item.key ? "bg-violet-500/20 text-violet-200" : "text-muted-foreground hover:text-foreground"}`}
+              className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm ${
+                tab.key === item.key
+                  ? "bg-violet-500/20 text-violet-200"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
             >
               <item.icon className="size-4" />
               {item.label}
@@ -123,6 +133,7 @@ export default function HistoryPage() {
           />
         </div>
       </div>
+
       {data.loading ? (
         <LoadingState label="Loading history" />
       ) : data.error ? (

@@ -3,13 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Bot,
+  ChevronLeft,
   Copy,
+  History,
   LoaderCircle,
   MessageSquarePlus,
+  PanelLeftOpen,
   RefreshCw,
   Send,
   Square,
   User,
+  X,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -39,22 +43,34 @@ type Chat = {
   messages: Message[];
   updatedAt: string;
 };
+
 export default function ChatPage() {
   const history = useApiData<Chat[]>("/api/ai/chat?limit=30", []);
   const [chatId, setChatId] = useState<string>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
-  useEffect(
-    () => bottom.current?.scrollIntoView({ behavior: "smooth" }),
-    [messages],
-  );
+
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
   const selectChat = (chat: Chat) => {
     setChatId(chat.id);
     setMessages(chat.messages);
+    setMobileSidebarOpen(false);
   };
+
+  const handleNewChat = () => {
+    setChatId(undefined);
+    setMessages([]);
+    setMobileSidebarOpen(false);
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     const message = input.trim();
@@ -95,6 +111,7 @@ export default function ChatPage() {
       abort.current = null;
     }
   };
+
   const regenerate = async (message: Message) => {
     if (!chatId || streaming) return;
     setStreaming(true);
@@ -116,60 +133,140 @@ export default function ChatPage() {
       setStreaming(false);
     }
   };
+
+  // List component for Chat History items to avoid code repetition
+  const renderChatList = () => {
+    if (history.loading) {
+      return <LoadingState label="Loading chats" />;
+    }
+    if (history.error) {
+      return <ErrorState message={history.error} retry={history.retry} />;
+    }
+    return (
+      <div className="space-y-1">
+        {Array.isArray(history.data) && history.data.length > 0 ? (
+          history.data.map((chat) => (
+            <button
+              key={chat.id}
+              onClick={() => selectChat(chat)}
+              className={`w-full truncate rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+                chat.id === chatId
+                  ? "bg-violet-500/15 text-violet-200"
+                  : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+              }`}
+            >
+              {chat.title}
+            </button>
+          ))
+        ) : (
+          <div className="p-3 text-center text-xs text-muted-foreground">
+            No previous chats found.
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <DashboardPage className="h-[calc(100vh-4rem)] max-w-none overflow-hidden p-0 sm:p-0 lg:p-0">
-      <div className="grid h-full md:grid-cols-[260px_1fr]">
-        <aside className="hidden overflow-y-auto border-r border-white/10 bg-black/10 p-3 md:block">
+    <DashboardPage className="h-[calc(100vh-4rem)] max-w-none overflow-hidden p-0 sm:p-0 lg:p-0 relative">
+      
+      {/* Mobile Sidebar Overlay */}
+      {mobileSidebarOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm md:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
+      {/* Mobile Sidebar Drawer */}
+      <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-background border-r border-white/10 p-3 flex flex-col transition-transform duration-300 md:hidden ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex items-center justify-between mb-3 gap-2">
           <Button
-            className="mb-3 w-full justify-start"
+            className="w-full justify-start overflow-hidden truncate"
             variant="outline"
-            onClick={() => {
-              setChatId(undefined);
-              setMessages([]);
-            }}
+            onClick={handleNewChat}
           >
-            <MessageSquarePlus />
-            New conversation
+            <MessageSquarePlus className="size-4 mr-2 shrink-0" />
+            <span className="truncate">New conversation</span>
           </Button>
-          {history.loading ? (
-            <LoadingState label="Loading chats" />
-          ) : history.error ? (
-            <ErrorState message={history.error} retry={history.retry} />
-          ) : (
-            <div className="space-y-1">
-              {history.data.map((chat) => (
-                <button
-                  key={chat.id}
-                  onClick={() => selectChat(chat)}
-                  className={`w-full truncate rounded-lg px-3 py-2.5 text-left text-sm ${chat.id === chatId ? "bg-violet-500/15 text-violet-200" : "text-muted-foreground hover:bg-white/5 hover:text-foreground"}`}
-                >
-                  {chat.title}
-                </button>
-              ))}
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label="Close sidebar"
+            onClick={() => setMobileSidebarOpen(false)}
+            className="shrink-0"
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pr-1">
+          {renderChatList()}
+        </div>
+      </div>
+
+      <div className={`grid h-full transition-all duration-300 ${sidebarOpen ? "md:grid-cols-[260px_1fr]" : "md:grid-cols-[60px_1fr]"}`}>
+        
+        {/* Desktop Sidebar */}
+        <aside className="hidden overflow-y-auto overflow-x-hidden border-r border-white/10 bg-black/10 p-3 md:flex md:flex-col">
+          <div className="flex items-center justify-between mb-3 gap-2">
+            {sidebarOpen && (
+              <Button
+                className="w-full justify-start overflow-hidden truncate"
+                variant="outline"
+                onClick={handleNewChat}
+              >
+                <MessageSquarePlus className="size-4 mr-2 shrink-0" />
+                <span className="truncate">New conversation</span>
+              </Button>
+            )}
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label={sidebarOpen ? "Minimize sidebar" : "Expand sidebar"}
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="shrink-0 hidden md:flex mx-auto"
+            >
+              {sidebarOpen ? <ChevronLeft className="size-4" /> : <PanelLeftOpen className="size-4" />}
+            </Button>
+          </div>
+
+          {sidebarOpen && (
+            <div className="flex-1 overflow-y-auto overflow-x-hidden pr-1">
+              {renderChatList()}
             </div>
           )}
         </aside>
-        <section className="flex min-w-0 flex-col">
-          <div className="border-b border-white/10 px-4 py-4 sm:px-6">
+
+        {/* Main Chat Section */}
+        <section className="flex min-w-0 flex-col h-full overflow-hidden">
+          <div className="border-b border-white/10 px-4 py-4 sm:px-6 shrink-0 flex items-center justify-between">
             <PageHeader
               title="AI Chat"
               description="Ask questions, explore ideas and create with Luro."
-              action={
-                <Button
-                  className="md:hidden"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setChatId(undefined);
-                    setMessages([]);
-                  }}
-                >
-                  <MessageSquarePlus />
-                  New
-                </Button>
-              }
             />
+            <div className="flex items-center gap-2">
+              {/* Mobile Show Chats Button */}
+              <Button
+                className="md:hidden"
+                size="sm"
+                variant="outline"
+                onClick={() => setMobileSidebarOpen(true)}
+              >
+                <History className="size-4 mr-1" />
+                Chats
+              </Button>
+              <Button
+                className="md:hidden"
+                size="sm"
+                variant="outline"
+                onClick={handleNewChat}
+              >
+                <MessageSquarePlus className="size-4 mr-1" />
+                New
+              </Button>
+            </div>
           </div>
+
           <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
             {messages.length === 0 ? (
               <EmptyState
@@ -182,7 +279,11 @@ export default function ChatPage() {
                 {messages.map((message) => (
                   <article key={message.id} className="flex gap-3">
                     <div
-                      className={`mt-1 rounded-lg p-2 ${message.role === "user" ? "bg-white/10" : "bg-violet-500/15 text-violet-300"}`}
+                      className={`mt-1 rounded-lg p-2 h-fit ${
+                        message.role === "user"
+                          ? "bg-white/10"
+                          : "bg-violet-500/15 text-violet-300"
+                      }`}
                     >
                       {message.role === "user" ? (
                         <User className="size-4" />
@@ -215,7 +316,7 @@ export default function ChatPage() {
                               )
                             }
                           >
-                            <Copy />
+                            <Copy className="size-4" />
                           </Button>
                           <Button
                             size="icon"
@@ -224,7 +325,7 @@ export default function ChatPage() {
                             disabled={streaming}
                             onClick={() => void regenerate(message)}
                           >
-                            <RefreshCw />
+                            <RefreshCw className="size-4" />
                           </Button>
                         </div>
                       )}
@@ -235,9 +336,10 @@ export default function ChatPage() {
               </div>
             )}
           </div>
+
           <form
             onSubmit={submit}
-            className="border-t border-white/10 bg-background/80 p-3 backdrop-blur sm:p-4"
+            className="border-t border-white/10 bg-background/80 p-3 backdrop-blur sm:p-4 shrink-0"
           >
             <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-white/15 bg-white/[0.035] p-2 focus-within:border-violet-400/50">
               <textarea
@@ -262,7 +364,7 @@ export default function ChatPage() {
                   onClick={() => abort.current?.abort()}
                   aria-label="Stop response"
                 >
-                  <Square />
+                  <Square className="size-4" />
                 </Button>
               ) : (
                 <Button
@@ -270,7 +372,7 @@ export default function ChatPage() {
                   disabled={!input.trim()}
                   aria-label="Send message"
                 >
-                  <Send />
+                  <Send className="size-4" />
                 </Button>
               )}
             </div>

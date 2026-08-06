@@ -20,6 +20,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiRequest, getApiError } from "@/store/api";
 import { copyText } from "@/lib/dashboard-client";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Translation = {
   id: string;
@@ -28,6 +35,7 @@ type Translation = {
   sourceText: string;
   translatedText: string;
 };
+
 const languages = [
   "Auto-detect",
   "English",
@@ -44,12 +52,14 @@ const languages = [
   "Korean",
   "Turkish",
 ];
+
 export default function TranslatorPage() {
   const [source, setSource] = useState("Auto-detect");
   const [target, setTarget] = useState("English");
   const [text, setText] = useState("");
   const [result, setResult] = useState<Translation | null>(null);
   const [loading, setLoading] = useState(false);
+
   const translate = async () => {
     if (!text.trim()) return;
     setLoading(true);
@@ -60,12 +70,14 @@ export default function TranslatorPage() {
           data: { sourceLanguage: source, targetLanguage: target, text },
         }),
       );
+      toast.success("Translation complete!");
     } catch (error) {
       toast.error(getApiError(error, "Unable to translate text."));
     } finally {
       setLoading(false);
     }
   };
+
   const swap = () => {
     if (source === "Auto-detect") return;
     setSource(target);
@@ -73,103 +85,130 @@ export default function TranslatorPage() {
     setText(result?.translatedText ?? text);
     setResult(null);
   };
+
   return (
-    <DashboardPage>
+    <DashboardPage className="space-y-6">
       <PageHeader
         title="Translator"
         description="Translate naturally across languages while preserving intent and nuance."
       />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="border-white/10 bg-white/[0.025]">
-          <CardContent className="space-y-4 p-5">
-            <div className="flex items-end gap-2">
-              <Field label="From">
-                <select
-                  value={source}
-                  onChange={(event) => setSource(event.target.value)}
-                  className={formControlClass}
-                >
-                  {languages.map((language) => (
-                    <option key={language}>{language}</option>
-                  ))}
-                </select>
-              </Field>
+      <div className="grid gap-6 lg:grid-cols-2">
+        
+        {/* Source Box */}
+        <Card className="border-white/10 bg-white/[0.02] shadow-2xl backdrop-blur">
+          <CardContent className="space-y-4 p-5 sm:p-6">
+            <div className="flex items-end gap-2.5">
+              <div className="flex-1">
+                <Field label="From">
+                  <Select value={source} onValueChange={setSource}>
+                    <SelectTrigger className={`${formControlClass} bg-white/[0.03] border-white/10 w-full`}>
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent className="border-white/10 bg-background">
+                      {languages.map((language) => (
+                        <SelectItem key={language} value={language}>
+                          {language}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
               <Button
                 variant="outline"
                 size="icon"
                 onClick={swap}
                 disabled={source === "Auto-detect"}
                 aria-label="Swap languages"
+                className="border-white/10 hover:bg-white/5 shrink-0"
               >
-                <ArrowRightLeft />
+                <ArrowRightLeft className="size-4" />
               </Button>
             </div>
+            
             <textarea
               value={text}
               onChange={(event) => setText(event.target.value)}
               maxLength={50000}
-              rows={15}
+              rows={12}
               placeholder="Enter text to translate…"
-              className={`${formControlClass} resize-none border-0 bg-transparent text-base focus:ring-0`}
+              className={`${formControlClass} resize-none border-0 bg-transparent text-base focus:ring-0 p-0 text-foreground/90`}
             />
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
+
+            <div className="flex items-center justify-between pt-3 border-t border-white/10">
+              <span className="text-xs text-muted-foreground font-mono">
                 {text.length.toLocaleString()} / 50,000
               </span>
               <Button
                 onClick={() => void translate()}
                 disabled={!text.trim() || loading}
-                className="bg-violet-500 text-white hover:bg-violet-400"
+                className="bg-violet-600 text-white hover:bg-violet-500 shadow-lg shadow-violet-500/20 px-5"
               >
                 {loading ? (
-                  <LoaderCircle className="animate-spin" />
+                  <LoaderCircle className="animate-spin size-4" />
                 ) : (
-                  <Sparkles />
+                  <Sparkles className="size-4" />
                 )}
                 {loading ? "Translating…" : "Translate"}
               </Button>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-white/10 bg-white/[0.025]">
-          <CardContent className="space-y-4 p-5">
-            <Field label="To">
-              <select
-                value={target}
-                onChange={(event) => setTarget(event.target.value)}
-                className={formControlClass}
-              >
-                {languages.slice(1).map((language) => (
-                  <option key={language}>{language}</option>
-                ))}
-              </select>
-            </Field>
-            {result ? (
-              <>
-                <div className="min-h-[320px] whitespace-pre-wrap text-base leading-8">
+
+        {/* Target Box */}
+        <Card className="border-white/10 bg-white/[0.02] shadow-2xl backdrop-blur">
+          <CardContent className="space-y-4 p-5 sm:p-6 flex flex-col h-full justify-between">
+            <div className="space-y-4">
+              <Field label="To">
+                <Select value={target} onValueChange={setTarget}>
+                  <SelectTrigger className={`${formControlClass} bg-white/[0.03] border-white/10 w-full`}>
+                    <SelectValue placeholder="Select language" />
+                  </SelectTrigger>
+                  <SelectContent className="border-white/10 bg-background">
+                    {languages.slice(1).map((language) => (
+                      <SelectItem key={language} value={language}>
+                        {language}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              {result ? (
+                <div className="min-h-[280px] whitespace-pre-wrap text-base leading-8 text-foreground/90 pt-2">
                   {result.translatedText}
                 </div>
+              ) : (
+                <div className="py-12">
+                  <EmptyState
+                    icon={Languages}
+                    title="Translation appears here"
+                    description="Select your languages and enter the text you want to translate."
+                  />
+                </div>
+              )}
+            </div>
+
+            {result && (
+              <div className="pt-4 border-t border-white/10 flex justify-end">
                 <Button
                   variant="outline"
+                  size="sm"
+                  className="border-white/10 hover:bg-white/5"
                   onClick={() =>
                     void copyText(result.translatedText).then(() =>
-                      toast.success("Copied"),
+                      toast.success("Copied to clipboard"),
                     )
                   }
                 >
-                  <Copy />
+                  <Copy className="size-4 mr-1.5" />
                   Copy translation
                 </Button>
-              </>
-            ) : (
-              <EmptyState
-                icon={Languages}
-                title="Translation appears here"
-                description="Select your languages and enter the text you want to translate."
-              />
+              </div>
             )}
           </CardContent>
         </Card>
+
       </div>
     </DashboardPage>
   );

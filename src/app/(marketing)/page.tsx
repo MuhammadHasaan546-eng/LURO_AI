@@ -65,7 +65,7 @@ const MarketingPage = () => {
         description="Start your free trial today and see how Luro can help you streamline your workflow."
         primaryAction={{
           label: "Start Free Trial",
-          href: "/signup",
+          href: "/auth/signup",
         }}
         secondaryAction={{
           label: "Learn More",
