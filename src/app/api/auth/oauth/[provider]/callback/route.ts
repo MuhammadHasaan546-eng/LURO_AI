@@ -3,9 +3,9 @@ import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { audit, createSession, getCurrentSession, hashToken } from "@/lib/auth";
 import { exchangeAndVerify, isProviderName, oauthProviders } from "@/lib/oauth";
-const fallback = (message: string) =>
+const fallback = (message: string, path = "/auth/signin") =>
   NextResponse.redirect(
-    new URL(`/auth/signin?error=${encodeURIComponent(message)}`, env.APP_URL),
+    new URL(`${path}?error=${encodeURIComponent(message)}`, env.APP_URL),
   );
 
 export async function GET(
@@ -76,7 +76,12 @@ export async function GET(
       return NextResponse.redirect(new URL("/account?linked=1", url.origin));
     }
     let userId = existingIdentity?.userId;
-    if (!userId) {
+    if (challenge.intent === "signin" && !userId) {
+      return fallback(
+        "No account exists for this Google email. Please sign up first.",
+      );
+    }
+    if (challenge.intent === "signup" && !userId) {
       if (!identity.email || !identity.emailVerified)
         return fallback(
           "This provider did not provide a verified email address.",
@@ -86,7 +91,8 @@ export async function GET(
       });
       if (emailUser)
         return fallback(
-          "An account already exists with this email. Sign in with your existing method, then link this provider from account settings.",
+          "An account already exists with this email. Please sign in instead.",
+          "/auth/signup",
         );
       const user = await db.user.create({
         data: {
@@ -109,6 +115,7 @@ export async function GET(
       if (!user) throw new Error("Failed to create OAuth user");
       userId = user.id;
     }
+    if (!userId) return fallback("We could not find an account for this sign-in.");
     if (current)
       await db.session.update({
         where: { id: current.id },

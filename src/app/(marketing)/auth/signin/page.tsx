@@ -3,8 +3,15 @@ import Signin from "@/components/auth/Signin";
 import LiquidChrome from "@/components/ui/LiquidChrome";
 import { getCurrentSession } from "@/lib/auth";
 
-const SigninPage = async () => {
+const SigninPage = async ({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) => {
   const session = await getCurrentSession();
+  const params = await searchParams;
+  const oauthError =
+    typeof params.error === "string" ? params.error.slice(0, 500) : undefined;
 
   if (session) {
     return <AlreadyAuthenticatedRedirect />;
@@ -28,7 +35,7 @@ const SigninPage = async () => {
 
       {/* 3. Auth Form Floating on top */}
       <div className="relative z-20 w-full max-w-md px-4">
-        <Signin />
+        <Signin oauthError={oauthError} />
       </div>
     </main>
   );

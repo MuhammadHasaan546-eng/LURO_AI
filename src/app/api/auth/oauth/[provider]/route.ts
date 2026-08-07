@@ -34,8 +34,13 @@ const safeReturnTo = (value: string | null) => {
     return "/app";
   }
 };
-const requestedIntent = (value: string | null) =>
+type LoggedOutOAuthIntent = "signin" | "signup";
+const requestedIntent = (value: string | null): LoggedOutOAuthIntent =>
   value === "signup" ? "signup" : "signin";
+const sessionIntent = (
+  session: Awaited<ReturnType<typeof getCurrentSession>>,
+  value: string | null,
+) => ({ session, value: session ? ("link" as const) : requestedIntent(value) });
 
 export async function GET(
   request: Request,
@@ -61,7 +66,10 @@ export async function GET(
       { status: 429 },
     );
   const url = new URL(request.url);
-  const intent = sessionIntent(await getCurrentSession(), url.searchParams.get("intent"));
+  const intent = sessionIntent(
+    await getCurrentSession(),
+    url.searchParams.get("intent"),
+  );
   const state = randomBytes(32).toString("hex");
   const nonce = randomBytes(32).toString("hex");
   const verifier = randomBytes(32).toString("base64url");
