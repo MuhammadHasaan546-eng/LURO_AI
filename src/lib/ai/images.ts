@@ -1,6 +1,7 @@
-// src/lib/ai/images.ts
 import "server-only";
 
+import https from "node:https";
+import axios, { AxiosError } from "axios";
 import { env } from "@/lib/env";
 import type { ImageInput } from "@/lib/ai/contracts";
 import { getCloudinary, getPollinationsImageUrl } from "@/lib/ai/providers";
@@ -9,73 +10,125 @@ import { HttpError } from "@/lib/ai/http";
 import { connectToDatabase } from "@/lib/mongoose";
 import { ImageModel } from "@/models";
 
+const pollinationsAgent = new https.Agent({
+  family: 4,
+  autoSelectFamily: false,
+  keepAlive: true,
+});
+
+const downloadPollinationsImage = async (imageUrl: string) => {
+  try {
+    const response = await axios.get<ArrayBuffer>(imageUrl, {
+      responseType: "arraybuffer",
+      timeout: 30_000,
+      maxContentLength: 25_000_000,
+      maxBodyLength: 25_000_000,
+      httpsAgent: pollinationsAgent,
+      headers: {
+        "User-Agent": "Luro-AI/1.0",
+        Accept: "image/*",
+      },
+    });
+
+    const contentType = String(response.headers["content-type"] ?? "");
+    if (!contentType.toLowerCase().startsWith("image/")) {
+      throw new HttpError(
+        502,
+        "INVALID_PROVIDER_RESPONSE",
+        "Image provider returned an invalid response.",
+      );
+    }
+
+    return {
+      buffer: Buffer.from(response.data),
+      contentType: contentType.split(";", 1)[0],
+    };
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+
+    const providerError = error as AxiosError;
+    console.error("[Pollinations Request Error]:", {
+      code: providerError.code,
+      status: providerError.response?.status,
+      message: providerError.message,
+    });
+
+    if (
+      providerError.code === AxiosError.ETIMEDOUT ||
+      providerError.code === AxiosError.ECONNABORTED
+    ) {
+      throw new HttpError(
+        504,
+        "PROVIDER_TIMEOUT",
+        "Pollinations image server timed out.",
+      );
+    }
+
+    if (providerError.response) {
+      throw new HttpError(
+        502,
+        "PROVIDER_ERROR",
+        `Pollinations API failed with status: ${providerError.response.status}`,
+      );
+    }
+
+    throw new HttpError(
+      503,
+      "PROVIDER_UNAVAILABLE",
+      "Failed to connect to Pollinations image server.",
+    );
+  }
+};
+
+type CloudinaryUploadError = Error & {
+  http_code?: number;
+};
+
+const uploadImage = async (userId: string, base64Image: string) => {
+  try {
+    return await getCloudinary().uploader.upload(base64Image, {
+      folder: `luro-ai/${userId}`,
+      resource_type: "image",
+      overwrite: false,
+    });
+  } catch (error) {
+    const uploadError = error as CloudinaryUploadError;
+    console.error("[Cloudinary Upload Error]:", {
+      name: uploadError.name,
+      status: uploadError.http_code,
+      message: uploadError.message,
+    });
+
+    if (uploadError.http_code === 401 || uploadError.http_code === 403) {
+      throw new HttpError(
+        503,
+        "IMAGE_STORAGE_PERMISSION_DENIED",
+        "Image storage credentials do not have upload permission.",
+      );
+    }
+
+    throw new HttpError(
+      502,
+      "IMAGE_STORAGE_ERROR",
+      "Failed to store the generated image.",
+    );
+  }
+};
+
 export const createImage = async (userId: string, input: ImageInput) => {
   await assertUsageAvailable(userId, "images", 1);
 
   const selectedModel = env.POLLINATIONS_IMAGE_MODEL || "flux";
-
-  // 1. Pollinations AI se public direct Image URL banayein
   const imageUrl = getPollinationsImageUrl(
     input.prompt,
     selectedModel,
-    input.size || "1024x1024"
+    input.size || "1024x1024",
   );
+  const { buffer, contentType } = await downloadPollinationsImage(imageUrl);
+  const base64Image = `data:${contentType};base64,${buffer.toString("base64")}`;
 
-  if (!imageUrl) {
-    throw new HttpError(
-      502,
-      "EMPTY_PROVIDER_RESPONSE",
-      "Image provider returned no image."
-    );
-  }
+  const uploaded = await uploadImage(userId, base64Image);
 
-  // 2. Pollinations se image fetch karein (Browser Headers added to bypass 403 Cloudflare block)
-  let imageResponse: Response;
-  try {
-    imageResponse = await fetch(imageUrl, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-        Referer: "https://pollinations.ai/",
-      },
-      // Timeout handle karne ke liye (15 seconds)
-      signal: AbortSignal.timeout(15000),
-    });
-  } catch (err: any) {
-    console.error("[Pollinations Network Error]:", err);
-    throw new HttpError(
-      504,
-      "PROVIDER_TIMEOUT",
-      "Failed to connect to Pollinations image server."
-    );
-  }
-
-  if (!imageResponse.ok) {
-    console.error(
-      "[Pollinations Fetch Error]:",
-      imageResponse.status,
-      imageResponse.statusText
-    );
-    throw new HttpError(
-      502,
-      "PROVIDER_ERROR",
-      `Pollinations API failed with status: ${imageResponse.status}`
-    );
-  }
-
-  const arrayBuffer = await imageResponse.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-  const base64Image = `data:image/jpeg;base64,${buffer.toString("base64")}`;
-
-  // 3. Base64 Image ko Cloudinary par upload karein
-  const uploaded = await getCloudinary().uploader.upload(base64Image, {
-    folder: `luro-ai/${userId}`,
-    resource_type: "image",
-    overwrite: false,
-  });
-
-  // 4. Database (MongoDB) mein save karein
   await connectToDatabase();
   const image = await ImageModel.create({
     userId,
@@ -88,7 +141,6 @@ export const createImage = async (userId: string, input: ImageInput) => {
     model: `pollinations/${selectedModel}`,
   });
 
-  // 5. Usage Track karein
   await recordUsage({
     userId,
     feature: "image",
