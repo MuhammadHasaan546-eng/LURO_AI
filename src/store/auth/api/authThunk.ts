@@ -23,23 +23,8 @@ const rejectApiError = (error: unknown, fallback: string): ApiError => {
   return { ...apiError, message: getApiError(error, fallback) };
 };
 
-const rejectSignInError = (error: unknown) => {
-  const apiError = rejectApiError(
-    error,
-    "Unable to sign in. Please try again.",
-  );
-  const invalidCredentials =
-    apiError.status === 401 || apiError.code === "INVALID_CREDENTIALS";
-  return {
-    ...apiError,
-    message: invalidCredentials
-      ? "Incorrect username or password"
-      : apiError.message,
-    formErrors: invalidCredentials
-      ? ["Incorrect username or password"]
-      : apiError.formErrors,
-  };
-};
+const rejectSignInError = (error: unknown) =>
+  rejectApiError(error, "Unable to sign in. Please try again.");
 
 type AuthThunkConfig = { rejectValue: ApiError };
 

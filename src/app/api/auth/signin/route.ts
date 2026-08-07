@@ -15,8 +15,22 @@ import {
 import { db } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rate-limit";
 
-const invalid = () =>
-  errorResponse("INVALID_CREDENTIALS", "Incorrect username or password", 401);
+const invalidPassword = () =>
+  errorResponse("INVALID_PASSWORD", "The password you entered is incorrect.", 401, {
+    fieldErrors: { password: ["The password you entered is incorrect."] },
+  });
+
+const oauthOnly = () =>
+  errorResponse(
+    "OAUTH_ONLY_ACCOUNT",
+    "This account uses Google sign-in and does not have a password. Continue with Google instead.",
+    409,
+    {
+      formErrors: [
+        "This account uses Google sign-in and does not have a password. Continue with Google instead.",
+      ],
+    },
+  );
 
 const userNotFound = () =>
   errorResponse("USER_NOT_FOUND", "User does not exist. Please sign up.", 404);
@@ -77,12 +91,13 @@ async function signIn(request: Request) {
     await audit("signin", "FAILURE", undefined, request).catch(() => undefined);
     return userNotFound();
   }
-  if (
-    !user.passwordHash ||
-    !(await verifyPassword(password, user.passwordHash))
-  ) {
+  if (!user.passwordHash) {
     await audit("signin", "FAILURE", user.id, request).catch(() => undefined);
-    return invalid();
+    return oauthOnly();
+  }
+  if (!(await verifyPassword(password, user.passwordHash))) {
+    await audit("signin", "FAILURE", user.id, request).catch(() => undefined);
+    return invalidPassword();
   }
   await db.user.update({
     where: { id: user.id },
