@@ -41,7 +41,8 @@ const rejectError = (error: unknown, fallback: string): ApiError => ({
   message: getApiError(error, fallback),
 });
 
-export const fetchAccountRequest = () => apiRequest<Account>("/api/account");
+export const fetchAccountRequest = (signal?: AbortSignal) =>
+  apiRequest<Account>("/api/account", { signal });
 
 export const mutateAccountRequest = async (mutation: Mutation) => {
   const config: Record<

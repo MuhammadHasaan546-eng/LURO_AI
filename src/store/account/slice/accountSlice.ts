@@ -54,6 +54,7 @@ const accountSlice = createSlice({
         else state.status = "loading";
       })
       .addCase(fetchAccount.fulfilled, (state, action) => {
+        if (state.currentRequestId !== action.meta.requestId) return;
         state.data = action.payload ?? null;
         state.status = "succeeded";
         state.isRefreshing = false;
@@ -61,7 +62,17 @@ const accountSlice = createSlice({
         state.lastFetchedAt = Date.now();
       })
       .addCase(fetchAccount.rejected, (state, action) => {
-        if (action.meta.condition) return;
+        if (
+          action.meta.condition ||
+          state.currentRequestId !== action.meta.requestId
+        )
+          return;
+        if (action.meta.aborted) {
+          state.status = state.data ? "succeeded" : "idle";
+          state.isRefreshing = false;
+          state.currentRequestId = null;
+          return;
+        }
         state.status = state.data ? "succeeded" : "failed";
         state.isRefreshing = false;
         

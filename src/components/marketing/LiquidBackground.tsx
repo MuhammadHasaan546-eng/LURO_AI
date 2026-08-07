@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef } from "react";
+import { useInView } from "motion/react";
 import { type Colors, Liquid } from "@/components/ui/liquid-gradient";
 
 // Dark Violet / Electric Blue Palette jo humare Dark Theme ke sath match kare
@@ -29,23 +30,17 @@ export const LiquidBackground = ({
 }: {
   children?: React.ReactNode;
 }) => {
-  const [isHovered, setIsHovered] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isInView = useInView(containerRef, { margin: "150px 0px" });
 
   return (
-    <div
-      className="relative w-full overflow-hidden"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      {/* --- Liquid Canvas Background Layer --- */}
-      <div className="absolute inset-0 w-full h-full opacity-40 mix-blend-screen pointer-events-none filter blur-xl">
-        <Liquid isHovered={isHovered} colors={DARK_LIQUID_COLORS} />
+    <div ref={containerRef} className="relative w-full overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 h-full w-full opacity-40">
+        <Liquid colors={DARK_LIQUID_COLORS} active={isInView} />
       </div>
 
-      {/* Dark Overlay for Readability */}
-      <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-[2px] pointer-events-none" />
+      <div className="pointer-events-none absolute inset-0 bg-slate-950/60" />
 
-      {/* Main Content Layer */}
       <div className="relative z-10">{children}</div>
     </div>
   );

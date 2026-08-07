@@ -19,7 +19,15 @@ export default function AccountPanel() {
   );
 
   useEffect(() => {
-    void dispatch(fetchAccount());
+    let request: { abort: () => void } | null = null;
+    const task = window.setTimeout(() => {
+      request = dispatch(fetchAccount());
+    }, 0);
+
+    return () => {
+      window.clearTimeout(task);
+      request?.abort();
+    };
   }, [dispatch]);
 
   const action = async (payload: Parameters<typeof mutateAccount>[0]) => {

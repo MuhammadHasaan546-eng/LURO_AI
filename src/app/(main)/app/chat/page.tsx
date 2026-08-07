@@ -59,6 +59,14 @@ export default function ChatPage() {
     bottom.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(
+    () => () => {
+      abort.current?.abort();
+      abort.current = null;
+    },
+    [],
+  );
+
   const selectChat = (chat: Chat) => {
     setChatId(chat.id);
     setMessages(chat.messages);

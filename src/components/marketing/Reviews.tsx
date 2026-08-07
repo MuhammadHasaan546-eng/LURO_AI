@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useRef } from "react";
+import { useInView, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Marquee } from "@/components/ui/marquee";
 
@@ -89,8 +90,16 @@ const ReviewCard = ({
 };
 
 export default function Testimonials() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const isInView = useInView(sectionRef, { margin: "150px 0px" });
+  const reduceMotion = useReducedMotion();
+  const shouldAnimate = isInView && !reduceMotion;
+
   return (
-    <section className="relative w-full py-12 sm:py-20 px-4 sm:px-8 max-w-7xl mx-auto overflow-hidden">
+    <section
+      ref={sectionRef}
+      className="relative w-full py-12 sm:py-20 px-4 sm:px-8 max-w-7xl mx-auto overflow-hidden"
+    >
       {/* Section Header */}
       <div className="text-center mb-8 sm:mb-12">
         <span className="px-3 py-1 text-xs font-semibold text-violet-400 bg-violet-500/10 border border-violet-500/20 rounded-full uppercase tracking-wider">
@@ -114,22 +123,48 @@ export default function Testimonials() {
               "translateX(-100px) translateY(0px) translateZ(-100px) rotateX(20deg) rotateY(-10deg) rotateZ(20deg)",
           }}
         >
-          <Marquee pauseOnHover vertical className="[--duration:25s]">
+          <Marquee
+            pauseOnHover
+            vertical
+            repeat={2}
+            active={shouldAnimate}
+            className="[--duration:25s] motion-reduce:animate-none"
+          >
             {firstRow.map((review) => (
               <ReviewCard key={review.username} {...review} />
             ))}
           </Marquee>
-          <Marquee reverse pauseOnHover vertical className="[--duration:25s]">
+          <Marquee
+            reverse
+            pauseOnHover
+            vertical
+            repeat={2}
+            active={shouldAnimate}
+            className="[--duration:25s] motion-reduce:animate-none"
+          >
             {secondRow.map((review) => (
               <ReviewCard key={review.username} {...review} />
             ))}
           </Marquee>
-          <Marquee reverse pauseOnHover vertical className="[--duration:25s]">
+          <Marquee
+            reverse
+            pauseOnHover
+            vertical
+            repeat={2}
+            active={shouldAnimate}
+            className="[--duration:25s] motion-reduce:animate-none"
+          >
             {thirdRow.map((review) => (
               <ReviewCard key={review.username} {...review} />
             ))}
           </Marquee>
-          <Marquee pauseOnHover vertical className="[--duration:25s]">
+          <Marquee
+            pauseOnHover
+            vertical
+            repeat={2}
+            active={shouldAnimate}
+            className="[--duration:25s] motion-reduce:animate-none"
+          >
             {fourthRow.map((review) => (
               <ReviewCard key={review.username} {...review} />
             ))}

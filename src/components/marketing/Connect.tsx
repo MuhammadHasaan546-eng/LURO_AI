@@ -3,6 +3,7 @@
 import { AnimatedBeam, Circle } from "@/components/ui/animated-beam";
 import { cn } from "@/lib/utils";
 import React, { useRef } from "react";
+import { useInView, useReducedMotion } from "framer-motion";
 import {
   Image,
   Zap,
@@ -27,6 +28,9 @@ export default function Connect({ className }: ConnectProps) {
   const div5Ref = useRef<HTMLDivElement>(null);
   const div6Ref = useRef<HTMLDivElement>(null);
   const div7Ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(containerRef, { margin: "150px 0px" });
+  const reduceMotion = useReducedMotion();
+  const animateBeams = isInView && !reduceMotion;
 
   return (
     <LiquidBackground>
@@ -122,6 +126,7 @@ export default function Connect({ className }: ConnectProps) {
           {/* Glowing Connecting Lines (Beams) */}
           <AnimatedBeam
             containerRef={containerRef}
+            active={animateBeams}
             fromRef={div1Ref}
             toRef={div4Ref}
             curvature={-75}
@@ -132,6 +137,7 @@ export default function Connect({ className }: ConnectProps) {
           />
           <AnimatedBeam
             containerRef={containerRef}
+            active={animateBeams}
             fromRef={div2Ref}
             toRef={div4Ref}
             dotted
@@ -140,6 +146,7 @@ export default function Connect({ className }: ConnectProps) {
           />
           <AnimatedBeam
             containerRef={containerRef}
+            active={animateBeams}
             fromRef={div3Ref}
             toRef={div4Ref}
             curvature={75}
@@ -150,6 +157,7 @@ export default function Connect({ className }: ConnectProps) {
           />
           <AnimatedBeam
             containerRef={containerRef}
+            active={animateBeams}
             fromRef={div5Ref}
             toRef={div4Ref}
             curvature={-75}
@@ -161,6 +169,7 @@ export default function Connect({ className }: ConnectProps) {
           />
           <AnimatedBeam
             containerRef={containerRef}
+            active={animateBeams}
             fromRef={div6Ref}
             toRef={div4Ref}
             reverse
@@ -170,6 +179,7 @@ export default function Connect({ className }: ConnectProps) {
           />
           <AnimatedBeam
             containerRef={containerRef}
+            active={animateBeams}
             fromRef={div7Ref}
             toRef={div4Ref}
             curvature={75}

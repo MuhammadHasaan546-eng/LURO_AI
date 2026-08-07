@@ -3,6 +3,8 @@
 import React, { useRef, useEffect } from "react";
 import { Renderer, Program, Mesh, Triangle } from "ogl";
 
+const DEFAULT_BASE_COLOR: [number, number, number] = [0.15, 0.05, 0.25];
+
 interface LiquidChromeProps extends React.HTMLAttributes<HTMLDivElement> {
   baseColor?: [number, number, number];
   speed?: number;
@@ -13,8 +15,7 @@ interface LiquidChromeProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 export const LiquidChrome: React.FC<LiquidChromeProps> = ({
-  // Default values tuned for Luro.ai dark purple theme
-  baseColor = [0.15, 0.05, 0.25], // Deep Purple
+  baseColor = DEFAULT_BASE_COLOR,
   speed = 0.3,
   amplitude = 0.6,
   frequencyX = 2.5,
@@ -24,6 +25,7 @@ export const LiquidChrome: React.FC<LiquidChromeProps> = ({
   ...props
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [baseRed, baseGreen, baseBlue] = baseColor;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -118,7 +120,9 @@ export const LiquidChrome: React.FC<LiquidChromeProps> = ({
             gl.canvas.width / gl.canvas.height,
           ]),
         },
-        uBaseColor: { value: new Float32Array(baseColor) },
+        uBaseColor: {
+          value: new Float32Array([baseRed, baseGreen, baseBlue]),
+        },
         uAmplitude: { value: amplitude },
         uFrequencyX: { value: frequencyX },
         uFrequencyY: { value: frequencyY },
@@ -163,18 +167,68 @@ export const LiquidChrome: React.FC<LiquidChromeProps> = ({
       container.addEventListener("touchmove", handleTouchMove);
     }
 
-    let animationId: number;
+    let animationId: number | null = null;
+    let isIntersecting = true;
+    let pageVisible = document.visibilityState === "visible";
+    const reducedMotionQuery = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    );
+    let reduceMotion = reducedMotionQuery.matches;
+
+    const shouldAnimate = () =>
+      isIntersecting && pageVisible && !reduceMotion;
+
+    function stopAnimation() {
+      if (animationId !== null) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+    }
+
     function update(t: number) {
-      animationId = requestAnimationFrame(update);
+      animationId = null;
+      if (!shouldAnimate()) return;
       program.uniforms.uTime.value = t * 0.001 * speed;
       renderer.render({ scene: mesh });
+      animationId = requestAnimationFrame(update);
     }
-    animationId = requestAnimationFrame(update);
+
+    function syncAnimation() {
+      if (!shouldAnimate()) {
+        stopAnimation();
+        return;
+      }
+      if (animationId === null) animationId = requestAnimationFrame(update);
+    }
+
+    const intersectionObserver = new IntersectionObserver(([entry]) => {
+      isIntersecting = entry.isIntersecting;
+      syncAnimation();
+    });
+    const handleVisibilityChange = () => {
+      pageVisible = document.visibilityState === "visible";
+      syncAnimation();
+    };
+    const handleReducedMotionChange = (event: MediaQueryListEvent) => {
+      reduceMotion = event.matches;
+      syncAnimation();
+    };
 
     container.appendChild(gl.canvas);
+    renderer.render({ scene: mesh });
+    intersectionObserver.observe(container);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    reducedMotionQuery.addEventListener("change", handleReducedMotionChange);
+    syncAnimation();
 
     return () => {
-      cancelAnimationFrame(animationId);
+      stopAnimation();
+      intersectionObserver.disconnect();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      reducedMotionQuery.removeEventListener(
+        "change",
+        handleReducedMotionChange,
+      );
       window.removeEventListener("resize", resize);
       if (interactive) {
         container.removeEventListener("mousemove", handleMouseMove);
@@ -185,7 +239,16 @@ export const LiquidChrome: React.FC<LiquidChromeProps> = ({
       }
       gl.getExtension("WEBGL_lose_context")?.loseContext();
     };
-  }, [baseColor, speed, amplitude, frequencyX, frequencyY, interactive]);
+  }, [
+    baseRed,
+    baseGreen,
+    baseBlue,
+    speed,
+    amplitude,
+    frequencyX,
+    frequencyY,
+    interactive,
+  ]);
 
   return (
     <div

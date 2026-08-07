@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect } from "react";
 import * as THREE from "three";
 import "./LightPillar.css";
 
@@ -29,19 +29,9 @@ const LightPillar = ({
   const mouseRef = useRef(new THREE.Vector2(0, 0));
   const timeRef = useRef(0);
   const rotationSpeedRef = useRef(rotationSpeed);
-  const [webGLSupported, setWebGLSupported] = useState(true);
 
   useEffect(() => {
-    const canvas = document.createElement("canvas");
-    const gl =
-      canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
-    if (!gl) {
-      setWebGLSupported(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!containerRef.current || !webGLSupported) return;
+    if (!containerRef.current) return;
 
     const container = containerRef.current;
     const width = container.clientWidth;
@@ -66,25 +56,28 @@ const LightPillar = ({
 
     const qualitySettings = {
       low: {
-        iterations: 24,
+        iterations: 16,
         waveIterations: 1,
-        pixelRatio: 0.5,
+        pixelRatio: 0.45,
         precision: "mediump",
-        stepMultiplier: 1.5,
+        stepMultiplier: 1.7,
+        targetFPS: 20,
       },
       medium: {
-        iterations: 40,
-        waveIterations: 2,
-        pixelRatio: 0.65,
+        iterations: 24,
+        waveIterations: 1,
+        pixelRatio: 0.55,
         precision: "mediump",
-        stepMultiplier: 1.2,
+        stepMultiplier: 1.45,
+        targetFPS: 30,
       },
       high: {
-        iterations: 80,
-        waveIterations: 4,
-        pixelRatio: Math.min(window.devicePixelRatio, 2),
+        iterations: 36,
+        waveIterations: 2,
+        pixelRatio: Math.min(window.devicePixelRatio, 1),
         precision: "highp",
-        stepMultiplier: 1.0,
+        stepMultiplier: 1.25,
+        targetFPS: 40,
       },
     };
 
@@ -102,8 +95,8 @@ const LightPillar = ({
         stencil: false,
         depth: false,
       });
-    } catch (error) {
-      setWebGLSupported(false);
+    } catch {
+      container.dataset.webglUnavailable = "true";
       return;
     }
 
@@ -265,10 +258,16 @@ const LightPillar = ({
     }
 
     let lastTime = performance.now();
-    const targetFPS = effectiveQuality === "low" ? 30 : 60;
-    const frameTime = 1000 / targetFPS;
+    const frameTime = 1000 / settings.targetFPS;
 
-    const animate = (currentTime) => {
+    let isVisible = document.visibilityState === "visible";
+    let isIntersecting = true;
+    const reducedMotionQuery = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    );
+    let prefersReducedMotion = reducedMotionQuery.matches;
+
+    const renderFrame = (advanceTime = true) => {
       if (
         !materialRef.current ||
         !rendererRef.current ||
@@ -277,21 +276,68 @@ const LightPillar = ({
       )
         return;
 
-      const deltaTime = currentTime - lastTime;
-
-      if (deltaTime >= frameTime) {
+      if (advanceTime) {
         timeRef.current += 0.016 * rotationSpeedRef.current;
-        const t = timeRef.current;
-        materialRef.current.uniforms.uTime.value = t;
-        materialRef.current.uniforms.uRotCos.value = Math.cos(t * 0.3);
-        materialRef.current.uniforms.uRotSin.value = Math.sin(t * 0.3);
-        rendererRef.current.render(sceneRef.current, cameraRef.current);
+      }
+      const t = timeRef.current;
+      materialRef.current.uniforms.uTime.value = t;
+      materialRef.current.uniforms.uRotCos.value = Math.cos(t * 0.3);
+      materialRef.current.uniforms.uRotSin.value = Math.sin(t * 0.3);
+      rendererRef.current.render(sceneRef.current, cameraRef.current);
+    };
+
+    const stopAnimation = () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+
+    const animate = (currentTime) => {
+      rafRef.current = null;
+      if (!isVisible || !isIntersecting || prefersReducedMotion) return;
+
+      const deltaTime = currentTime - lastTime;
+      if (deltaTime >= frameTime) {
+        renderFrame(true);
         lastTime = currentTime - (deltaTime % frameTime);
       }
 
       rafRef.current = requestAnimationFrame(animate);
     };
-    rafRef.current = requestAnimationFrame(animate);
+
+    const syncAnimation = () => {
+      stopAnimation();
+      if (!isVisible || !isIntersecting) return;
+      if (prefersReducedMotion) {
+        renderFrame(false);
+        return;
+      }
+      lastTime = performance.now();
+      rafRef.current = requestAnimationFrame(animate);
+    };
+
+    const handleVisibilityChange = () => {
+      isVisible = document.visibilityState === "visible";
+      syncAnimation();
+    };
+    const handleReducedMotionChange = (event) => {
+      prefersReducedMotion = event.matches;
+      syncAnimation();
+    };
+    const intersectionObserver = new IntersectionObserver(
+      ([entry]) => {
+        isIntersecting = entry.isIntersecting;
+        syncAnimation();
+      },
+      { rootMargin: "100px", threshold: 0.01 },
+    );
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    reducedMotionQuery.addEventListener("change", handleReducedMotionChange);
+    intersectionObserver.observe(container);
+    renderFrame(false);
+    syncAnimation();
 
     let resizeTimeout = null;
     const handleResize = () => {
@@ -316,12 +362,18 @@ const LightPillar = ({
     window.addEventListener("resize", handleResize, { passive: true });
 
     return () => {
+      stopAnimation();
+      if (mouseMoveTimeout) clearTimeout(mouseMoveTimeout);
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      reducedMotionQuery.removeEventListener(
+        "change",
+        handleReducedMotionChange,
+      );
+      intersectionObserver.disconnect();
       window.removeEventListener("resize", handleResize);
       if (interactive) {
         container.removeEventListener("mousemove", handleMouseMove);
-      }
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
       }
       if (rendererRef.current) {
         rendererRef.current.dispose();
@@ -340,7 +392,10 @@ const LightPillar = ({
       geometryRef.current = null;
       rafRef.current = null;
     };
-  }, [webGLSupported, quality]);
+    // Visual props are synchronized through the uniform effects below. Recreating
+    // the WebGL context for those updates would discard GPU resources needlessly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quality, interactive]);
 
   useEffect(() => {
     rotationSpeedRef.current = rotationSpeed;
@@ -400,17 +455,6 @@ const LightPillar = ({
     materialRef.current.uniforms.uPillarRotCos.value = Math.cos(pillarRotRad);
     materialRef.current.uniforms.uPillarRotSin.value = Math.sin(pillarRotRad);
   }, [pillarRotation]);
-
-  if (!webGLSupported) {
-    return (
-      <div
-        className={`light-pillar-fallback ${className}`}
-        style={{ mixBlendMode }}
-      >
-        WebGL not supported
-      </div>
-    );
-  }
 
   return (
     <div

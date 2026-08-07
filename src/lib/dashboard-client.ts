@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiRequest, getApiError } from "@/store/api";
 
 export type ApiCollection<T> = T[];
@@ -77,21 +77,45 @@ export function useApiData<T>(url: string, initial: T) {
   const [data, setData] = useState<T>(initial);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestRef = useRef<{ controller: AbortController; id: number } | null>(
+    null,
+  );
+  const requestIdRef = useRef(0);
+
   const load = useCallback(async () => {
+    requestRef.current?.controller.abort();
+    const controller = new AbortController();
+    const id = ++requestIdRef.current;
+    requestRef.current = { controller, id };
+
     setLoading(true);
     setError(null);
     try {
-      setData(await apiRequest<T>(url));
+      const result = await apiRequest<T>(url, { signal: controller.signal });
+      if (!controller.signal.aborted && requestRef.current?.id === id) {
+        setData(result);
+      }
     } catch (requestError) {
-      setError(getApiError(requestError, "Unable to load this data."));
+      if (!controller.signal.aborted && requestRef.current?.id === id) {
+        setError(getApiError(requestError, "Unable to load this data."));
+      }
     } finally {
-      setLoading(false);
+      if (requestRef.current?.id === id) {
+        requestRef.current = null;
+        if (!controller.signal.aborted) setLoading(false);
+      }
     }
   }, [url]);
+
   useEffect(() => {
     const task = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(task);
+    return () => {
+      window.clearTimeout(task);
+      requestRef.current?.controller.abort();
+      requestRef.current = null;
+    };
   }, [load]);
+
   return { data, setData, loading, error, retry: load };
 }
 

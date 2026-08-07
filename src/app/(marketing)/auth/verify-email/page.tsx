@@ -15,7 +15,15 @@ export default function VerifyEmailPage() {
       : new URLSearchParams(location.search).get("token");
 
   useEffect(() => {
-    void dispatch(verifyEmail(token));
+    let request: { abort: () => void } | null = null;
+    const task = window.setTimeout(() => {
+      request = dispatch(verifyEmail(token));
+    }, 0);
+
+    return () => {
+      window.clearTimeout(task);
+      request?.abort();
+    };
   }, [dispatch, token]);
 
   return (

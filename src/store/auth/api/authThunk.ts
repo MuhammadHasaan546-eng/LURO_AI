@@ -139,9 +139,9 @@ export const verifyEmail = createAsyncThunk<
   AuthThunkConfig
 >(
   "auth/verifyEmail",
-  async (token, { rejectWithValue }) => {
+  async (token, { rejectWithValue, signal }) => {
     try {
-      return await verifyEmailRequest(token);
+      return await verifyEmailRequest(token, signal);
     } catch (error) {
       return rejectWithValue(
         rejectApiError(error, "Unable to verify your email."),

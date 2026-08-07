@@ -85,10 +85,14 @@ export const resetPasswordRequest = (payload: ResetPasswordPayload) =>
     data: payload,
   });
 
-export const verifyEmailRequest = (token: string | null) =>
+export const verifyEmailRequest = (
+  token: string | null,
+  signal?: AbortSignal,
+) =>
   apiRequest<AuthResponse>("/api/auth/verify-email", {
     method: "POST",
     data: { token },
+    signal,
   });
 
 export const resendVerificationRequest = () =>

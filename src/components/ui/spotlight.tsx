@@ -1,6 +1,6 @@
 "use client";
 import { cn } from "@/lib/utils";
-import React, { useRef, useState, useContext, createContext } from "react";
+import React, { useContext, createContext } from "react";
 interface SpotlightProps {
   children: React.ReactNode;
   className?: string;
@@ -53,80 +53,51 @@ export const Spotlight = ({
 export function SpotLightItem({ children, className }: SpotlightItemProps) {
   const { HoverFocusSpotlight, ProximitySpotlight, CursorFlowGradient } =
     useSpotlight();
-  const boxWrapper = useRef(null);
-  const [isHovered, setIsHovered] = useState(false);
-  const [mousePosition, setMousePosition] = React.useState<{
-    x: number | null;
-    y: number | null;
-  }>({
-    x: null,
-    y: null,
-  });
-  React.useEffect(() => {
-    const updateMousePosition = (ev: globalThis.MouseEvent) => {
-      setMousePosition({ x: ev.clientX, y: ev.clientY });
-    };
-    window.addEventListener("mousemove", updateMousePosition);
-    return () => {
-      window.removeEventListener("mousemove", updateMousePosition);
-    };
-  }, []);
 
-  const [overlayColor, setOverlayColor] = useState({ x: 0, y: 0 });
-  const handleMouemove = ({
-    currentTarget,
-    clientX,
-    clientY,
-  }: React.MouseEvent<HTMLDivElement>) => {
-    const { left, top } = currentTarget.getBoundingClientRect();
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const element = event.currentTarget;
+    const { left, top } = element.getBoundingClientRect();
 
-    setOverlayColor({
-      x: clientX - left,
-      y: clientY - top,
-    });
+    element.style.setProperty("--spotlight-local-x", `${event.clientX - left}px`);
+    element.style.setProperty("--spotlight-local-y", `${event.clientY - top}px`);
+    element.style.setProperty("--spotlight-screen-x", `${event.clientX}px`);
+    element.style.setProperty("--spotlight-screen-y", `${event.clientY}px`);
   };
-  // console.log(overlayColor)
 
   return (
     <div
-      onMouseMove={handleMouemove}
-      onMouseEnter={() => CursorFlowGradient && setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      ref={boxWrapper}
+      onPointerMove={handlePointerMove}
       className={cn(
         className,
-        " relative  rounded-lg p-[2px] bg-[#ffffff15] overflow-hidden",
+        "group/spotlight relative rounded-lg p-[2px] bg-[#ffffff15] overflow-hidden",
       )}
     >
-      {isHovered && (
+      {CursorFlowGradient && (
         <div
-          className="pointer-events-none absolute opacity-0 z-50 rounded-xl w-full h-full group-hover:opacity-100  transition duration-300 "
+          className="pointer-events-none absolute inset-0 z-50 rounded-xl opacity-0 transition-opacity duration-300 group-hover/spotlight:opacity-100"
           style={{
-            background: `
-            radial-gradient(
-              250px circle at ${overlayColor.x}px ${overlayColor.y}px,
-              rgba(255, 255, 255, 0.137),
-              transparent 80%
-            )
-          `,
+            background:
+              "radial-gradient(250px circle at var(--spotlight-local-x, 50%) var(--spotlight-local-y, 50%), rgba(255, 255, 255, 0.137), transparent 80%)",
           }}
         />
       )}
       {HoverFocusSpotlight && (
         <div
-          className="absolute opacity-0 group-hover:opacity-100 z-10 inset-0 bg-fixed rounded-lg"
+          className="pointer-events-none absolute inset-0 z-10 rounded-lg bg-fixed opacity-0 transition-opacity duration-300 group-hover/spotlight:opacity-100"
           style={{
-            background: `radial-gradient(circle at ${mousePosition.x}px ${mousePosition.y}px, #ffffff76 0%,transparent 20%,transparent) fixed `,
+            background:
+              "radial-gradient(circle at var(--spotlight-screen-x, 50%) var(--spotlight-screen-y, 50%), #ffffff76 0%, transparent 20%) fixed",
           }}
-        ></div>
+        />
       )}
       {ProximitySpotlight && (
         <div
-          className="absolute inset-0 z-0  bg-fixed rounded-lg"
+          className="pointer-events-none absolute inset-0 z-0 rounded-lg bg-fixed"
           style={{
-            background: `radial-gradient(circle at ${mousePosition.x}px ${mousePosition.y}px, #ffffff6e 0%,transparent 20%,transparent) fixed`,
+            background:
+              "radial-gradient(circle at var(--spotlight-screen-x, 50%) var(--spotlight-screen-y, 50%), #ffffff6e 0%, transparent 20%) fixed",
           }}
-        ></div>
+        />
       )}
       {children}
     </div>

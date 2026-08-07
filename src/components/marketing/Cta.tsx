@@ -1,7 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { motion, type Variants } from "framer-motion";
+import {
+  motion,
+  useInView,
+  useReducedMotion,
+  type Variants,
+} from "framer-motion";
 import LightPillar from "@/components/LightPillar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -127,9 +132,15 @@ export function Cta({
 }: CtaProps) {
   const Heading = headingAs;
   const headingId = React.useId();
+  const sectionRef = React.useRef<HTMLElement>(null);
+  const isNearViewport = useInView(sectionRef, {
+    margin: "300px 0px",
+  });
+  const reduceMotion = useReducedMotion();
 
   return (
     <section
+      ref={sectionRef}
       aria-labelledby={headingId}
       className={cn(
         "w-full px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24",
@@ -149,32 +160,42 @@ export function Cta({
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 z-0 opacity-75"
         >
-          <LightPillar
-            topColor="#8b5cf6"
-            bottomColor="#ec4899"
-            intensity={0.8}
-            rotationSpeed={0.25}
-            interactive={false}
-            glowAmount={0.003}
-            pillarWidth={3}
-            pillarHeight={0.4}
-            noiseIntensity={0.35}
-            mixBlendMode="screen"
-            quality="medium"
-          />
+          {isNearViewport ? (
+            <LightPillar
+              topColor="#8b5cf6"
+              bottomColor="#ec4899"
+              intensity={0.8}
+              rotationSpeed={0.25}
+              interactive={false}
+              glowAmount={0.003}
+              pillarWidth={3}
+              pillarHeight={0.4}
+              noiseIntensity={0.35}
+              mixBlendMode="screen"
+              quality="medium"
+            />
+          ) : null}
         </div>
 
         {/* Pulsing Ambient Glow */}
         <motion.div
-          animate={{
-            opacity: [0.15, 0.3, 0.15],
-            scale: [0.95, 1.05, 0.95],
-          }}
-          transition={{
-            duration: 6,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+          animate={
+            isNearViewport && !reduceMotion
+              ? {
+                  opacity: [0.15, 0.3, 0.15],
+                  scale: [0.95, 1.05, 0.95],
+                }
+              : { opacity: 0.2, scale: 1 }
+          }
+          transition={
+            isNearViewport && !reduceMotion
+              ? {
+                  duration: 6,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }
+              : { duration: 0 }
+          }
           className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-violet-600/30 blur-3xl"
         />
 

@@ -23,9 +23,9 @@ export const fetchAccount = createAsyncThunk<
   { state: { account: AccountStateShape }; rejectValue: ApiError }
 >(
   "account/fetch",
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, signal }) => {
     try {
-      return await fetchAccountRequest();
+      return await fetchAccountRequest(signal);
     } catch (error) {
       return rejectWithValue({
         message: getApiError(error, "Unable to load your account."),

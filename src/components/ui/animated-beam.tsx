@@ -344,6 +344,7 @@ export const Icons = {
 
 export interface AnimatedBeamProps {
   className?: string;
+  active?: boolean;
   containerRef: RefObject<HTMLElement | null>; // Container ref
   fromRef: RefObject<HTMLElement | null>;
   toRef: RefObject<HTMLElement | null>;
@@ -366,12 +367,13 @@ export interface AnimatedBeamProps {
 
 const AnimatedBeam: React.FC<AnimatedBeamProps> = ({
   className,
+  active = true,
   containerRef,
   fromRef,
   toRef,
   curvature = 0,
   reverse = false, // Include the reverse prop
-  duration = Math.random() * 3 + 4,
+  duration = 5.5,
   delay = 0,
   pathColor = "gray",
   pathWidth = 2,
@@ -414,7 +416,11 @@ const AnimatedBeam: React.FC<AnimatedBeamProps> = ({
 
         const svgWidth = containerRect.width;
         const svgHeight = containerRect.height;
-        setSvgDimensions({ width: svgWidth, height: svgHeight });
+        setSvgDimensions((current) =>
+          current.width === svgWidth && current.height === svgHeight
+            ? current
+            : { width: svgWidth, height: svgHeight },
+        );
 
         const startX =
           rectA.left - containerRect.left + rectA.width / 2 + startXOffset;
@@ -427,16 +433,13 @@ const AnimatedBeam: React.FC<AnimatedBeamProps> = ({
 
         const controlY = startY - curvature;
         const d = `M ${startX},${startY} Q ${(startX + endX) / 2},${controlY} ${endX},${endY}`;
-        setPathD(d);
+        setPathD((current) => (current === d ? current : d));
       }
     };
 
     // Initialize ResizeObserver
-    const resizeObserver = new ResizeObserver((entries) => {
-      // For all entries, recalculate the path
-      for (const entry of entries) {
-        updatePath();
-      }
+    const resizeObserver = new ResizeObserver(() => {
+      updatePath();
     });
 
     // Observe the container element
@@ -511,19 +514,27 @@ const AnimatedBeam: React.FC<AnimatedBeamProps> = ({
             y1: "0%",
             y2: "0%",
           }}
-          animate={{
-            x1: gradientCoordinates.x1,
-            x2: gradientCoordinates.x2,
-            y1: gradientCoordinates.y1,
-            y2: gradientCoordinates.y2,
-          }}
-          transition={{
-            delay,
-            duration,
-            ease: [0.16, 1, 0.3, 1], // https://easings.net/#easeOutExpo
-            repeat: Number.POSITIVE_INFINITY,
-            repeatDelay: 0,
-          }}
+          animate={
+            active
+              ? {
+                  x1: gradientCoordinates.x1,
+                  x2: gradientCoordinates.x2,
+                  y1: gradientCoordinates.y1,
+                  y2: gradientCoordinates.y2,
+                }
+              : { x1: "0%", x2: "0%", y1: "0%", y2: "0%" }
+          }
+          transition={
+            active
+              ? {
+                  delay,
+                  duration,
+                  ease: [0.16, 1, 0.3, 1],
+                  repeat: Number.POSITIVE_INFINITY,
+                  repeatDelay: 0,
+                }
+              : { duration: 0 }
+          }
         >
           <stop stopColor={gradientStartColor} stopOpacity="0"></stop>
           <stop stopColor={gradientStartColor}></stop>

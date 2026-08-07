@@ -33,18 +33,38 @@ export const Navbar = ({ isAuthenticated }: NavbarProps) => {
   const [activeHash, setActiveHash] = useState("#product");
 
   useEffect(() => {
-    const syncPageState = () => {
-      setIsScrolled(window.scrollY > 20);
-      setActiveHash(window.location.hash || "#product");
+    let animationFrame: number | null = null;
+
+    const syncScrollState = () => {
+      animationFrame = null;
+      const nextIsScrolled = window.scrollY > 20;
+      setIsScrolled((current) =>
+        current === nextIsScrolled ? current : nextIsScrolled,
+      );
     };
 
-    syncPageState();
-    window.addEventListener("scroll", syncPageState, { passive: true });
-    window.addEventListener("hashchange", syncPageState);
+    const scheduleScrollSync = () => {
+      if (animationFrame === null) {
+        animationFrame = window.requestAnimationFrame(syncScrollState);
+      }
+    };
+
+    const syncHash = () => {
+      const nextHash = window.location.hash || "#product";
+      setActiveHash((current) => (current === nextHash ? current : nextHash));
+    };
+
+    syncScrollState();
+    syncHash();
+    window.addEventListener("scroll", scheduleScrollSync, { passive: true });
+    window.addEventListener("hashchange", syncHash);
 
     return () => {
-      window.removeEventListener("scroll", syncPageState);
-      window.removeEventListener("hashchange", syncPageState);
+      if (animationFrame !== null) {
+        window.cancelAnimationFrame(animationFrame);
+      }
+      window.removeEventListener("scroll", scheduleScrollSync);
+      window.removeEventListener("hashchange", syncHash);
     };
   }, []);
 

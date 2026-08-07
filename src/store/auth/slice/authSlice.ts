@@ -68,7 +68,8 @@ const authSlice = createSlice({
         })
         .addCase(
           thunk.fulfilled,
-          (state, action: PayloadAction<AuthResponse>) => {
+          (state, action: PayloadAction<AuthResponse, string, { requestId: string }>) => {
+            if (state.currentRequestId !== action.meta.requestId) return;
             state.status = "succeeded";
             state.data = action.payload;
             state.error = null;
@@ -77,7 +78,17 @@ const authSlice = createSlice({
           },
         )
         .addCase(thunk.rejected, (state, action) => {
-          if (action.meta.condition) return;
+          if (
+            action.meta.condition ||
+            state.currentRequestId !== action.meta.requestId
+          )
+            return;
+          if (action.meta.aborted) {
+            state.status = "idle";
+            state.operation = null;
+            state.currentRequestId = null;
+            return;
+          }
           const payload = action.payload as ApiError | undefined;
           state.status = "failed";
           state.error =

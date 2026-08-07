@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { motion } from "framer-motion";
+import React, { useEffect, useRef, useState } from "react";
+import { motion, useInView, useReducedMotion } from "framer-motion";
 
 const footerLinks = {
   product: [
@@ -82,32 +82,60 @@ export default function Footer() {
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
 
+  const footerRef = useRef<HTMLElement>(null);
+  const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isInView = useInView(footerRef, { margin: "150px 0px" });
+  const reduceMotion = useReducedMotion();
+  const shouldAnimate = isInView && !reduceMotion;
+
+  useEffect(
+    () => () => {
+      if (resetTimeoutRef.current) clearTimeout(resetTimeoutRef.current);
+    },
+    [],
+  );
+
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
     if (email) {
       setSubscribed(true);
       setEmail("");
-      setTimeout(() => setSubscribed(false), 3000);
+      if (resetTimeoutRef.current) clearTimeout(resetTimeoutRef.current);
+      resetTimeoutRef.current = setTimeout(() => {
+        setSubscribed(false);
+        resetTimeoutRef.current = null;
+      }, 3000);
     }
   };
 
   return (
-    <footer className="relative w-full border-t border-white/10 bg-slate-950 pt-16 pb-12 overflow-hidden">
+    <footer
+      ref={footerRef}
+      className="relative w-full border-t border-white/10 bg-slate-950 pt-16 pb-12 overflow-hidden"
+    >
       {/* Dynamic Background Glow Layer */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-0"
       >
         <motion.div
-          animate={{
-            opacity: [0.2, 0.4, 0.2],
-            scale: [0.9, 1.1, 0.9],
-          }}
-          transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
+          animate={
+            shouldAnimate
+              ? {
+                  opacity: [0.2, 0.4, 0.2],
+                  scale: [0.9, 1.1, 0.9],
+                }
+              : { opacity: 0.2, scale: 1 }
+          }
+          transition={
+            shouldAnimate
+              ? {
+                  duration: 8,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }
+              : { duration: 0 }
+          }
           className="absolute -bottom-32 left-1/2 -translate-x-1/2 w-[700px] h-[300px] bg-gradient-to-tr from-violet-600/30 via-pink-500/20 to-indigo-600/20 blur-[100px] rounded-full"
         />
         <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-violet-500/40 to-transparent" />
