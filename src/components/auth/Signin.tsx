@@ -158,6 +158,7 @@ export const Signin = () => {
 
       <div className="grid grid-cols-2 gap-3">
         <Link
+          prefetch={false}
           href="/api/auth/oauth/google"
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm font-medium hover:bg-white/10 transition duration-200"
         >
@@ -182,6 +183,7 @@ export const Signin = () => {
           Google
         </Link>
         <Link
+          prefetch={false}
           href="/api/auth/oauth/apple"
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm font-medium hover:bg-white/10 transition duration-200"
         >

@@ -23,8 +23,19 @@ const providerConfig = {
 
 const redirectUri = (provider: string) =>
   `${env.APP_URL}/api/auth/oauth/${provider}/callback`;
-const safeReturnTo = (value: string | null) =>
-  value && value.startsWith("/") && !value.startsWith("//") ? value : "/app";
+const safeReturnTo = (value: string | null) => {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/app";
+  try {
+    const parsed = new URL(value, env.APP_URL);
+    return parsed.origin === new URL(env.APP_URL).origin
+      ? `${parsed.pathname}${parsed.search}${parsed.hash}`
+      : "/app";
+  } catch {
+    return "/app";
+  }
+};
+const requestedIntent = (value: string | null) =>
+  value === "signup" ? "signup" : "signin";
 
 export async function GET(
   request: Request,
@@ -50,17 +61,18 @@ export async function GET(
       { status: 429 },
     );
   const url = new URL(request.url);
+  const intent = sessionIntent(await getCurrentSession(), url.searchParams.get("intent"));
   const state = randomBytes(32).toString("hex");
   const nonce = randomBytes(32).toString("hex");
   const verifier = randomBytes(32).toString("base64url");
-  const session = await getCurrentSession();
+  const session = intent.session;
   await db.oAuthChallenge.create({
     data: {
       stateHash: hashToken(state),
       nonceHash: hashToken(nonce),
       codeVerifier: verifier,
       provider: config.provider,
-      intent: session ? "link" : "signin",
+      intent: intent.value,
       returnTo: safeReturnTo(url.searchParams.get("returnTo")),
       userId: session?.userId ?? null,
       expiresAt: new Date(Date.now() + 10 * 60_000),

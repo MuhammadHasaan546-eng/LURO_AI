@@ -129,7 +129,7 @@ const oauthChallengeSchema = new Schema(
       maxlength: 256,
     },
     provider: { type: String, enum: ["GOOGLE", "APPLE"], required: true },
-    intent: { type: String, enum: ["signin", "link"], required: true },
+    intent: { type: String, enum: ["signin", "signup", "link"], required: true },
     returnTo: { type: String, required: true, maxlength: 2048 },
     userId: { type: String, default: null, ref: "User" },
     expiresAt: { type: Date, required: true },

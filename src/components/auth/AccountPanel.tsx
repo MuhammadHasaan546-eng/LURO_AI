@@ -218,12 +218,14 @@ export default function AccountPanel() {
         </div>
         <div className="mt-4 flex gap-2">
           <Link
+            prefetch={false}
             href="/api/auth/oauth/google?returnTo=/account"
             className="rounded-xl border border-white/15 px-4 py-2 text-sm hover:bg-white/5 transition-all"
           >
             Link Google
           </Link>
           <Link
+            prefetch={false}
             href="/api/auth/oauth/apple?returnTo=/account"
             className="rounded-xl border border-white/15 px-4 py-2 text-sm hover:bg-white/5 transition-all"
           >
