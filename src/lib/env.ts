@@ -86,9 +86,9 @@ const environmentSchema = Joi.object({
   CLOUDINARY_CLOUD_NAME: Joi.string().trim().min(1).max(255),
   CLOUDINARY_API_KEY: Joi.string().trim().min(1).max(255),
   CLOUDINARY_API_SECRET: Joi.string().min(1).max(2048),
-  STRIPE_SECRET_KEY: Joi.string().min(1).max(2048),
-  STRIPE_WEBHOOK_SECRET: Joi.string().min(1).max(2048),
-  STRIPE_PRO_PRICE_ID: Joi.string().trim().min(1).max(255),
+  STRIPE_SECRET_KEY: Joi.string().allow("").max(2048),
+  STRIPE_WEBHOOK_SECRET: Joi.string().allow("").max(2048),
+  STRIPE_PRO_PRICE_ID: Joi.string().allow("").max(255),
   APP_FREE_MONTHLY_TOKENS: Joi.number()
     .integer()
     .min(0)
@@ -158,14 +158,6 @@ const environmentSchema = Joi.object({
         message:
           "SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, and SMTP_PASS must all be configured together",
       });
-    if (
-      hasAllSmtpValues &&
-      ((value.SMTP_PORT === 465 && value.SMTP_SECURE !== true) ||
-        (value.SMTP_PORT === 587 && value.SMTP_SECURE !== false))
-    )
-      return helpers.error("any.custom", {
-        message: "SMTP_SECURE must be true for port 465 and false for port 587",
-      });
 
     const google = [value.GOOGLE_CLIENT_ID, value.GOOGLE_CLIENT_SECRET];
     if (google.some(Boolean) && !google.every(Boolean))
@@ -194,15 +186,15 @@ const environmentSchema = Joi.object({
         message: "All Cloudinary credentials must be configured",
       });
 
+    // STRIPE VALIDATION RELAXED: Webhook secret optionally chal sakta hai local dev mein
     const stripe = [
       value.STRIPE_SECRET_KEY,
-      value.STRIPE_WEBHOOK_SECRET,
       value.STRIPE_PRO_PRICE_ID,
     ];
     if (stripe.some(Boolean) && !stripe.every(Boolean))
       return helpers.error("any.custom", {
         message:
-          "Stripe secret, webhook secret, and Pro price ID must be configured together",
+          "STRIPE_SECRET_KEY and STRIPE_PRO_PRICE_ID must be configured together",
       });
 
     return value;
@@ -221,6 +213,7 @@ if (error) {
         : `${detail.path.join(".")}: ${detail.message}`,
     )
     .join("; ");
+  console.error("❌ Environment validation error:", details);
   throw new Error(`Invalid environment configuration: ${details}`);
 }
 

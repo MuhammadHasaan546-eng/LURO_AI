@@ -18,20 +18,23 @@ const seededFraction = (index: number, salt: number) => {
   return value - Math.floor(value)
 }
 
+const stableNumber = (value: number, precision = 6) =>
+  Number(value.toFixed(precision))
+
 const createSparkles = (
   count: number,
   colors: SparklesTextProps["colors"],
 ): Sparkle[] =>
   Array.from({ length: count }, (_, index) => ({
     id: index,
-    x: `${seededFraction(index, 1) * 100}%`,
-    y: `${seededFraction(index, 2) * 100}%`,
+    x: `${stableNumber(seededFraction(index, 1) * 100)}%`,
+    y: `${stableNumber(seededFraction(index, 2) * 100)}%`,
     color:
       seededFraction(index, 3) > 0.5
         ? (colors?.first ?? "#9E7AFF")
         : (colors?.second ?? "#FE8BBB"),
-    delay: `${seededFraction(index, 4) * 2}s`,
-    scale: seededFraction(index, 5) + 0.3,
+    delay: `${stableNumber(seededFraction(index, 4) * 2)}s`,
+    scale: stableNumber(seededFraction(index, 5) + 0.3),
   }))
 
 const SparkleIcon: React.FC<Sparkle> = ({ x, y, color, delay, scale }) => (
@@ -44,7 +47,7 @@ const SparkleIcon: React.FC<Sparkle> = ({ x, y, color, delay, scale }) => (
         top: y,
         color,
         animationDelay: delay,
-        "--sparkle-scale": scale,
+        "--sparkle-scale": String(scale),
       } as CSSProperties
     }
     width="21"

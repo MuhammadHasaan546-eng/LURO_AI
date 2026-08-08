@@ -6,7 +6,6 @@ import { handleRouteError, HttpError, requireAiSession } from "@/lib/ai/http";
 import {
   BillingConfigurationError,
   billingLog,
-  getConfiguredProPrice,
   getOrCreateCustomer,
   stripeErrorContext,
 } from "@/lib/billing";
@@ -22,14 +21,29 @@ export async function POST(request: Request) {
   let userId: string | undefined;
 
   try {
+    // 1. Session Auth Check
     const session = await requireAiSession(request);
+    if (!session || !session.userId) {
+      throw new HttpError(401, "UNAUTHORIZED", "User session is invalid or missing.");
+    }
     userId = session.userId;
-    const price = await getConfiguredProPrice();
 
+    // 2. Safe Price ID Check
+    const rawPriceId = env.STRIPE_PRO_PRICE_ID ?? process.env.STRIPE_PRO_PRICE_ID;
+    const priceId = typeof rawPriceId === "string" ? rawPriceId.trim() : undefined;
+
+    if (!priceId || !priceId.startsWith("price_")) {
+      throw new BillingConfigurationError(
+        "STRIPE_PRO_PRICE_ID is missing or invalid. Configure a Stripe Price ID beginning with 'price_'."
+      );
+    }
+
+    // 3. Database Check
     await connectToDatabase();
     const existing = await SubscriptionModel.findOne({
       userId: session.userId,
     }).lean();
+
     if (
       existing &&
       !Array.isArray(existing) &&
@@ -39,108 +53,82 @@ export async function POST(request: Request) {
       throw new HttpError(
         409,
         "SUBSCRIPTION_ALREADY_ACTIVE",
-        "Your Pro subscription is already active. Manage it from the billing portal.",
+        "Your Pro subscription is already active. Manage it from the billing portal."
       );
     }
 
-    if (
-      existing &&
-      !Array.isArray(existing) &&
-      existing.stripeCheckoutSessionStatus === "open" &&
-      existing.stripeCheckoutSessionId
-    ) {
-      try {
-        const openCheckout = await getStripe().checkout.sessions.retrieve(
-          existing.stripeCheckoutSessionId,
-        );
-        if (openCheckout.status === "open" && openCheckout.url) {
-          billingLog("info", "checkout_reused", {
-            requestId,
-            userId,
-            checkoutSessionId: openCheckout.id,
-          });
-          return successResponse(
-            { url: openCheckout.url },
-            "Existing checkout session reused.",
-          );
-        }
-      } catch (error) {
-        if (
-          !(error instanceof Stripe.errors.StripeError) ||
-          error.code !== "resource_missing"
-        ) {
-          throw error;
-        }
-      }
+    // 4. Safe Customer Check
+    const userEmail = session.user?.email;
+    const customer = await getOrCreateCustomer(session.userId, userEmail);
+    
+    if (!customer || !customer.stripeCustomerId) {
+      throw new Error("Billing profile or Stripe Customer ID could not be retrieved.");
     }
 
-    const customer = await getOrCreateCustomer(
-      session.userId,
-      session.user.email,
-    );
-    if (!customer) throw new Error("Billing profile could not be created.");
+    // 5. Safe Stripe Instance Call
+    const stripe = getStripe();
+    if (!stripe || !stripe.checkout || !stripe.checkout.sessions) {
+      throw new Error("Stripe client failed to initialize properly.");
+    }
 
-    const checkout = await getStripe().checkout.sessions.create(
-      {
-        mode: "subscription",
-        customer: customer.stripeCustomerId,
-        line_items: [{ price: price.id, quantity: 1 }],
-        success_url: `${env.APP_URL}/app/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${env.APP_URL}/app/billing?checkout=canceled`,
-        client_reference_id: session.userId,
-        metadata: { userId: session.userId },
-        subscription_data: { metadata: { userId: session.userId } },
-        allow_promotion_codes: true,
-        after_expiration: { recovery: { enabled: true } },
-      },
-      {
-        idempotencyKey: `luro-checkout-${session.userId}-${price.id}-${
-          existing && !Array.isArray(existing)
-            ? existing.stripeCheckoutSessionId ?? "new"
-            : "new"
-        }`,
-      },
-    );
-    if (!checkout.url) {
+    const appUrl = env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "";
+
+    const checkout = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      customer: customer.stripeCustomerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${appUrl}/app/billing?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/pricing`,
+      client_reference_id: session.userId,
+      metadata: { userId: session.userId },
+      subscription_data: { metadata: { userId: session.userId } },
+    });
+
+    if (!checkout || !checkout.url) {
       throw new Error("Stripe checkout session did not include a redirect URL.");
     }
 
-    await SubscriptionModel.findOneAndUpdate(
-      { userId: session.userId },
-      {
-        $set: {
-          stripeCheckoutSessionId: checkout.id,
-          stripeCheckoutSessionStatus: checkout.status,
-          stripeCheckoutUrl: checkout.url,
-        },
-      },
-      { new: true, runValidators: true },
-    );
     billingLog("info", "checkout_created", {
       requestId,
       userId,
       checkoutSessionId: checkout.id,
-      priceId: price.id,
+      priceId,
       durationMs: Date.now() - startedAt,
     });
+
     return successResponse({ url: checkout.url }, "Checkout session created.");
-  } catch (error) {
+
+  } catch (error: any) {
+    // Exact Debugging Log for Terminal
+    console.error(`[Checkout API Error] [ID: ${requestId}]:`, error);
+
+    // Safe error context execution
+    let errContext = {};
+    try {
+      errContext = stripeErrorContext(error) ?? {};
+    } catch {
+      errContext = { errorType: error?.name ?? "UnknownError", errorMessage: error?.message };
+    }
+
     billingLog("error", "checkout_failed", {
       requestId,
       userId,
       durationMs: Date.now() - startedAt,
-      ...stripeErrorContext(error),
+      ...errContext,
     });
+
     if (error instanceof BillingConfigurationError) {
       return errorResponse(error.code, error.message, error.status);
     }
-    if (error instanceof Stripe.errors.StripeError) {
+
+    if (error instanceof Stripe?.errors?.StripeError) {
       return errorResponse(
         "STRIPE_REQUEST_FAILED",
         "Stripe could not start checkout. Please try again shortly.",
-        502,
+        502
       );
     }
+
     return handleRouteError(error);
   }
 }

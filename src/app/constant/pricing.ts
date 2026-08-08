@@ -63,14 +63,19 @@ export const getPlanFeatures = (
   plan: PlanId,
   limits?: BillingLimits,
 ): string[] => {
-  if (!limits) return [];
+  const qualitativeFeatures =
+    plan === "free"
+      ? ["Core AI creation tools", "Standard processing"]
+      : ["All AI creation tools", "Higher usage capacity"];
+
+  if (!limits) return qualitativeFeatures;
+
   const prefix = plan === "free" ? "Up to" : "Includes";
   return [
     `${prefix} ${compactNumber.format(limits.tokens)} AI tokens per month`,
     `${prefix} ${compactNumber.format(limits.images)} generated images per month`,
     `${prefix} ${compactNumber.format(limits.pages)} PDF pages per month`,
-    plan === "free" ? "Core AI creation tools" : "All AI creation tools",
-    plan === "free" ? "Standard processing" : "Higher usage capacity",
+    ...qualitativeFeatures,
   ];
 };
 

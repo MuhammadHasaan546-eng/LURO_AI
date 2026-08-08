@@ -55,7 +55,7 @@ export default function DocsPage(): React.ReactElement {
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "content": "Automating social reach with Lume AI 🚀",
+    "content": "Automating social reach with Lume AI",
     "platforms": ["twitter", "linkedin"],
     "scheduleAt": "2026-08-10T09:40:00Z"
   }'`;

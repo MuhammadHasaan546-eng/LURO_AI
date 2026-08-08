@@ -36,18 +36,26 @@ export const getCloudinary = () => {
   return cloudinary;
 };
 
-export const getStripe = () => {
-  if (!env.STRIPE_SECRET_KEY) throw new ProviderConfigurationError("Stripe");
-  stripeClient ??= new Stripe(env.STRIPE_SECRET_KEY, {
-    appInfo: { name: "Luro AI" },
-    maxNetworkRetries: 2,
-  });
+export const getStripe = (): Stripe => {
+  // Check process.env fallback as well in case env object is missing it
+  const secretKey = env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
+
+  if (!secretKey) {
+    throw new ProviderConfigurationError("Stripe");
+  }
+
+  if (!stripeClient) {
+    stripeClient = new Stripe(secretKey, {
+      apiVersion: "2023-10-16" as any, // Explicit API Version fixes undefined methods in SDK
+      appInfo: { name: "Luro AI" },
+      maxNetworkRetries: 2,
+    });
+  }
+
   return stripeClient;
 };
 
 // Pollinations AI URL Generator (Fixed to public free endpoint)
-// `@/lib/ai/providers.ts`
-
 export const getPollinationsImageUrl = (
   prompt: string,
   model?: string,
@@ -55,7 +63,7 @@ export const getPollinationsImageUrl = (
 ) => {
   const selectedModel = model || env.POLLINATIONS_IMAGE_MODEL || "flux";
   
-  // DIRECT FREE PUBLIC ENDPOINT (env variable override ignore kar diya hai)
+  // DIRECT FREE PUBLIC ENDPOINT
   const baseUrl = "https://image.pollinations.ai/prompt";
   const [width, height] = (size || "1024x1024").split("x");
 

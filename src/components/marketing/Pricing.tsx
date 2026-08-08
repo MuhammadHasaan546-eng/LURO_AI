@@ -34,7 +34,8 @@ export default function Pricing() {
         method: "POST",
         data: {},
       });
-      window.location.assign(result.url);
+      if (!result.url) throw new Error("Checkout redirect was not returned.");
+      window.location.href = result.url;
     } catch (error) {
       setCatalogError(
         getApiError(error, "Unable to start checkout. Please sign in and try again."),
@@ -66,9 +67,7 @@ export default function Pricing() {
         {PLANS.map((plan) => {
           const isPro = plan.id === "pro";
           const price = catalog?.proPrice;
-          const features = catalog
-            ? getPlanFeatures(plan.id, catalog.limits[plan.id])
-            : [];
+          const features = getPlanFeatures(plan.id, catalog?.limits[plan.id]);
 
           return (
             <div
@@ -115,32 +114,22 @@ export default function Pricing() {
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-300">
                     Included features
                   </p>
-                  {catalog ? (
-                    <ul className="space-y-2.5">
-                      {features.map((feature) => (
-                        <li key={feature} className="flex items-start gap-2.5 text-xs text-slate-300 sm:text-sm">
-                          <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
-                          <span>{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-slate-500">Loading plan details...</p>
-                  )}
+                  <ul className="space-y-2.5">
+                    {features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2.5 text-xs text-slate-300 sm:text-sm">
+                        <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
               <button
                 type="button"
-                disabled={busy || !catalog}
+                disabled={busy}
                 onClick={() => {
                   if (!isPro) {
-                    window.location.assign("/auth/signup");
-                    return;
-                  }
-                  if (!catalog?.proPrice) {
-                    setCatalogError(
-                      "Pro checkout is unavailable until a valid Stripe Price ID is configured.",
-                    );
+                    window.location.href = "/auth/signup";
                     return;
                   }
                   void startCheckout();
@@ -155,9 +144,7 @@ export default function Pricing() {
                 {isPro
                   ? busy
                     ? "Opening checkout..."
-                    : catalog?.proPrice
-                      ? "Upgrade to Pro"
-                      : "Pro unavailable"
+                    : "Upgrade to Pro"
                   : "Get Started"}
               </button>
             </div>

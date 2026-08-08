@@ -82,7 +82,7 @@ export default function BillingPage() {
         data: {},
       });
       if (!result.url) throw new Error("Billing redirect was not returned.");
-      window.location.assign(result.url);
+      window.location.href = result.url;
     } catch (error) {
       toast.error(getApiError(error, "Unable to open billing."));
       setBusy(false);
@@ -117,12 +117,8 @@ export default function BillingPage() {
 
       {subscription.error ? (
         <ErrorState message={subscription.error} retry={subscription.retry} />
-      ) : subscription.loading || !catalog ? (
-        catalogError ? (
-          <ErrorState message={catalogError} retry={() => window.location.reload()} />
-        ) : (
-          <LoadingState label="Loading billing details" />
-        )
+      ) : subscription.loading ? (
+        <LoadingState label="Loading billing details" />
       ) : (
         <>
           <Card className="border-violet-500/20 bg-violet-500/10 backdrop-blur">
@@ -148,12 +144,18 @@ export default function BillingPage() {
             </CardContent>
           </Card>
 
+          {catalogError && (
+            <p role="alert" className="text-sm text-amber-300">
+              {catalogError} Checkout and subscription management remain available.
+            </p>
+          )}
+
           <div className="grid gap-6 pt-2 md:grid-cols-2">
             {(["free", "pro"] as PlanId[]).map((planId) => {
               const isPro = planId === "pro";
               const isCurrentPlan = planId === currentPlan;
-              const price = catalog.proPrice;
-              const planFeatures = getPlanFeatures(planId, catalog.limits[planId]);
+              const price = catalog?.proPrice;
+              const planFeatures = getPlanFeatures(planId, catalog?.limits[planId]);
 
               return (
                 <Card
@@ -227,12 +229,6 @@ export default function BillingPage() {
                       disabled={busy || isCurrentPlan || !isPro}
                       onClick={() => {
                         if (!isPro) return;
-                        if (!price) {
-                          toast.error(
-                            "Pro checkout is unavailable until a valid Stripe Price ID is configured.",
-                          );
-                          return;
-                        }
                         void billingAction("/api/stripe/checkout");
                       }}
                     >
@@ -244,12 +240,10 @@ export default function BillingPage() {
                       {isCurrentPlan
                         ? "Current plan"
                         : busy && isPro
-                        ? "Processing..."
-                        : isPro
-                        ? price
-                          ? "Upgrade to Pro"
-                          : "Pro unavailable"
-                        : "Included"}
+                          ? "Processing..."
+                          : isPro
+                            ? "Upgrade to Pro"
+                            : "Included"}
                     </Button>
                   </CardContent>
                 </Card>

@@ -52,29 +52,38 @@ export const billingLog = (
   else console.info(entry);
 };
 
+// FULLY SAFE STRIPE ERROR CONTEXT
 export const stripeErrorContext = (error: unknown) => {
-  if (!(error instanceof Stripe.errors.StripeError)) {
-    return { errorType: error instanceof Error ? error.name : "UnknownError" };
+  if (!error) return { errorType: "UnknownError" };
+
+  if (typeof error === "object" && error !== null && "type" in error && "code" in error) {
+    const err = error as any;
+    return {
+      errorType: err.type || "StripeError",
+      stripeCode: err.code,
+      stripeRequestId: err.requestId,
+      stripeStatus: err.statusCode,
+    };
   }
+
   return {
-    errorType: error.type,
-    stripeCode: error.code,
-    stripeRequestId: error.requestId,
-    stripeStatus: error.statusCode,
+    errorType: error instanceof Error ? error.name : "UnknownError",
+    errorMessage: error instanceof Error ? error.message : String(error),
   };
 };
 
 export const getConfiguredProPrice = async (): Promise<BillingPrice> => {
-  if (!env.STRIPE_SECRET_KEY || !env.STRIPE_PRO_PRICE_ID) {
+  const priceId = env.STRIPE_PRO_PRICE_ID || process.env.STRIPE_PRO_PRICE_ID;
+  if (!env.STRIPE_SECRET_KEY || !priceId) {
     throw new BillingConfigurationError();
   }
 
   let price: Stripe.Price;
   try {
-    price = await getStripe().prices.retrieve(env.STRIPE_PRO_PRICE_ID);
+    price = await getStripe().prices.retrieve(priceId);
   } catch (error) {
     billingLog("error", "price_validation_failed", {
-      priceId: env.STRIPE_PRO_PRICE_ID,
+      priceId,
       ...stripeErrorContext(error),
     });
     throw new BillingConfigurationError();
@@ -107,7 +116,9 @@ export const getConfiguredProPrice = async (): Promise<BillingPrice> => {
   };
 };
 
-export const getOrCreateCustomer = async (userId: string, email: string) => {
+export const getOrCreateCustomer = async (userId: string, email?: string) => {
+  if (!userId) throw new Error("User ID is required to get or create customer.");
+
   await connectToDatabase();
   const existing = await SubscriptionModel.findOne({ userId });
 
@@ -117,11 +128,8 @@ export const getOrCreateCustomer = async (userId: string, email: string) => {
         existing.stripeCustomerId,
       );
       if (!customer.deleted) return existing;
-    } catch (error) {
-      if (
-        !(error instanceof Stripe.errors.StripeError) ||
-        error.code !== "resource_missing"
-      ) {
+    } catch (error: any) {
+      if (error?.code !== "resource_missing") {
         throw error;
       }
       billingLog("info", "stale_customer_replaced", {
@@ -131,12 +139,20 @@ export const getOrCreateCustomer = async (userId: string, email: string) => {
     }
   }
 
+  // Safe email handle (agar email empty/undefined ho)
+  const customerPayload: Stripe.CustomerCreateParams = {
+    metadata: { userId },
+  };
+  if (email && typeof email === "string" && email.trim() !== "") {
+    customerPayload.email = email.trim();
+  }
+
   const customer = await getStripe().customers.create(
-    { email, metadata: { userId } },
+    customerPayload,
     { idempotencyKey: `luro-customer-${userId}` },
   );
 
-  return SubscriptionModel.findOneAndUpdate(
+  const updatedDoc = await SubscriptionModel.findOneAndUpdate(
     { userId },
     {
       $set: { stripeCustomerId: customer.id },
@@ -149,6 +165,8 @@ export const getOrCreateCustomer = async (userId: string, email: string) => {
     },
     { upsert: true, new: true, runValidators: true },
   );
+
+  return updatedDoc;
 };
 
 export const syncStripeCheckoutSession = async (
@@ -208,13 +226,13 @@ export const syncStripeSubscription = async (
   const customerId =
     typeof subscription.customer === "string"
       ? subscription.customer
-      : subscription.customer.id;
+      : subscription.customer?.id;
   await connectToDatabase();
-  const existing = await SubscriptionModel.findOne({
-    stripeCustomerId: customerId,
-  }).lean();
+  const existing = customerId
+    ? await SubscriptionModel.findOne({ stripeCustomerId: customerId }).lean()
+    : null;
   const userId =
-    subscription.metadata.userId ||
+    subscription.metadata?.userId ||
     (existing && !Array.isArray(existing) ? existing.userId : undefined);
   if (!userId) {
     billingLog("error", "subscription_user_missing", {
@@ -223,12 +241,12 @@ export const syncStripeSubscription = async (
     });
     return;
   }
-  const item = subscription.items.data[0];
-  const periodEnd = item?.current_period_end;
+  const item = subscription.items?.data?.[0];
+  const periodEnd = (subscription as any).current_period_end || item?.current_period_end;
   const entitled = hasProEntitlement({
     plan: "pro",
     status: subscription.status,
-    stripePriceId: item?.price.id,
+    stripePriceId: item?.price?.id,
   });
   await SubscriptionModel.findOneAndUpdate(
     { userId },
@@ -236,7 +254,7 @@ export const syncStripeSubscription = async (
       $set: {
         stripeCustomerId: customerId,
         stripeSubscriptionId: subscription.id,
-        stripePriceId: item?.price.id ?? null,
+        stripePriceId: item?.price?.id ?? null,
         plan: entitled ? "pro" : "free",
         entitled,
         status: subscription.status,
