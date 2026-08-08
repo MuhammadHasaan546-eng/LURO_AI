@@ -1,10 +1,11 @@
-import type Stripe from "stripe";
+import Stripe from "stripe";
 import { randomUUID } from "node:crypto";
 import { env } from "@/lib/env";
 import { getStripe } from "@/lib/ai/providers";
 import {
   billingLog,
   stripeErrorContext,
+  syncStripeCheckoutSession,
   syncStripeSubscription,
 } from "@/lib/billing";
 
@@ -52,8 +53,50 @@ export async function POST(request: Request) {
         "customer.subscription.updated",
         "customer.subscription.deleted",
       ].includes(event.type)
-    )
+    ) {
       await syncStripeSubscription(event.data.object as Stripe.Subscription);
+    } else if (
+      [
+        "checkout.session.completed",
+        "checkout.session.async_payment_succeeded",
+        "checkout.session.async_payment_failed",
+        "checkout.session.expired",
+      ].includes(event.type)
+    ) {
+      const checkout = event.data.object as Stripe.Checkout.Session;
+      await syncStripeCheckoutSession(checkout);
+      if (typeof checkout.subscription === "string") {
+        const subscription = await getStripe().subscriptions.retrieve(
+          checkout.subscription,
+        );
+        await syncStripeSubscription(subscription);
+      }
+    } else if (
+      ["invoice.paid", "invoice.payment_failed"].includes(event.type)
+    ) {
+      const invoice = event.data.object as Stripe.Invoice;
+      const invoiceRecord = invoice as unknown as {
+        subscription?: string | Stripe.Subscription | null;
+        parent?: {
+          subscription_details?: {
+            subscription?: string | Stripe.Subscription | null;
+          };
+        } | null;
+      };
+      const invoiceSubscription =
+        invoiceRecord.subscription ??
+        invoiceRecord.parent?.subscription_details?.subscription;
+      if (invoiceSubscription) {
+        const subscriptionId =
+          typeof invoiceSubscription === "string"
+            ? invoiceSubscription
+            : invoiceSubscription.id;
+        const subscription = await getStripe().subscriptions.retrieve(
+          subscriptionId,
+        );
+        await syncStripeSubscription(subscription);
+      }
+    }
     return Response.json({ received: true });
   } catch (error) {
     billingLog("error", "webhook_processing_failed", {

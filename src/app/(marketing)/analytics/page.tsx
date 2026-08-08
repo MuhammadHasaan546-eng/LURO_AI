@@ -35,6 +35,8 @@ const staggerContainer: Variants = {
   },
 };
 
+
+
 export default function AnalyticsPage(): React.ReactElement {
   const [timeRange, setTimeRange] = useState<string>("7d");
 

@@ -2,6 +2,7 @@ import "server-only";
 
 import mongoose from "mongoose";
 import { env } from "@/lib/env";
+import { hasProEntitlement } from "@/lib/billing";
 import { connectToDatabase } from "@/lib/mongoose";
 import {
   RateLimitBucketModel,
@@ -42,8 +43,8 @@ export const getPlan = async (userId: string) => {
   const subscription = (await SubscriptionModel.findOne({
     userId,
   }).lean()) as Subscription | null;
-  return subscription && ["active", "trialing"].includes(subscription.status)
-    ? (subscription.plan as "free" | "pro")
+  return subscription && hasProEntitlement(subscription)
+    ? "pro"
     : "free";
 };
 

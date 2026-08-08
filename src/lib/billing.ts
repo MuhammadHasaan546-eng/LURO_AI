@@ -3,6 +3,7 @@ import "server-only";
 import Stripe from "stripe";
 import { env } from "@/lib/env";
 import { getStripe } from "@/lib/ai/providers";
+import { hasProEntitlementForPrice } from "@/app/constant/pricing";
 import { connectToDatabase } from "@/lib/mongoose";
 import { SubscriptionModel } from "@/models";
 
@@ -14,24 +15,24 @@ export type BillingPrice = {
   intervalCount: number;
 };
 
-export const PRO_SUBSCRIPTION_STATUSES = ["active", "trialing"] as const;
-
 export const hasProEntitlement = (input: {
   plan?: string | null;
   status?: string | null;
   stripePriceId?: string | null;
 }) =>
-  input.plan === "pro" &&
-  PRO_SUBSCRIPTION_STATUSES.includes(
-    input.status as (typeof PRO_SUBSCRIPTION_STATUSES)[number],
-  ) &&
-  input.stripePriceId === env.STRIPE_PRO_PRICE_ID;
+  hasProEntitlementForPrice({
+    ...input,
+    configuredPriceId: env.STRIPE_PRO_PRICE_ID,
+  });
 
 export class BillingConfigurationError extends Error {
   readonly code = "BILLING_CONFIGURATION_INVALID";
   readonly status = 503;
 
-  constructor(message = "Billing is temporarily unavailable.") {
+  constructor(
+    message =
+      "Pro checkout is unavailable until a valid Stripe Price ID is configured.",
+  ) {
     super(message);
     this.name = "BillingConfigurationError";
   }
@@ -110,7 +111,7 @@ export const getOrCreateCustomer = async (userId: string, email: string) => {
   await connectToDatabase();
   const existing = await SubscriptionModel.findOne({ userId });
 
-  if (existing) {
+  if (existing?.stripeCustomerId) {
     try {
       const customer = await getStripe().customers.retrieve(
         existing.stripeCustomerId,

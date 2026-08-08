@@ -3,6 +3,7 @@ import {
   formatInterval,
   formatPrice,
   getPlanFeatures,
+  hasProEntitlementForPrice,
 } from "@/app/constant/pricing";
 
 describe("billing pricing contract", () => {
@@ -26,5 +27,31 @@ describe("billing pricing contract", () => {
     expect(
       getPlanFeatures("pro", { tokens: 1_000_000, images: 100, pages: 2_000 }),
     ).toContain("Includes 1M AI tokens per month");
+  });
+  it("grants Pro only for the configured price and active Stripe statuses", () => {
+    expect(
+      hasProEntitlementForPrice({
+        plan: "pro",
+        status: "active",
+        stripePriceId: "price_pro",
+        configuredPriceId: "price_pro",
+      }),
+    ).toBe(true);
+    expect(
+      hasProEntitlementForPrice({
+        plan: "pro",
+        status: "canceled",
+        stripePriceId: "price_pro",
+        configuredPriceId: "price_pro",
+      }),
+    ).toBe(false);
+    expect(
+      hasProEntitlementForPrice({
+        plan: "pro",
+        status: "active",
+        stripePriceId: "price_wrong",
+        configuredPriceId: "price_pro",
+      }),
+    ).toBe(false);
   });
 });

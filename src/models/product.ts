@@ -230,7 +230,12 @@ const subscriptionSchema = new Schema(
       enum: ["open", "complete", "expired", null],
       default: null,
     },
-    stripeCheckoutUrl: { type: String, default: null, maxlength: 2048 },
+    stripeCheckoutUrl: {
+      type: String,
+      default: null,
+      maxlength: 2048,
+      select: false,
+    },
     stripeSubscriptionId: { type: String, default: null, maxlength: 255 },
     stripePriceId: { type: String, default: null, maxlength: 255 },
     entitled: { type: Boolean, default: false, required: true },

@@ -43,28 +43,79 @@ export async function POST(request: Request) {
       );
     }
 
+    if (
+      existing &&
+      !Array.isArray(existing) &&
+      existing.stripeCheckoutSessionStatus === "open" &&
+      existing.stripeCheckoutSessionId
+    ) {
+      try {
+        const openCheckout = await getStripe().checkout.sessions.retrieve(
+          existing.stripeCheckoutSessionId,
+        );
+        if (openCheckout.status === "open" && openCheckout.url) {
+          billingLog("info", "checkout_reused", {
+            requestId,
+            userId,
+            checkoutSessionId: openCheckout.id,
+          });
+          return successResponse(
+            { url: openCheckout.url },
+            "Existing checkout session reused.",
+          );
+        }
+      } catch (error) {
+        if (
+          !(error instanceof Stripe.errors.StripeError) ||
+          error.code !== "resource_missing"
+        ) {
+          throw error;
+        }
+      }
+    }
+
     const customer = await getOrCreateCustomer(
       session.userId,
       session.user.email,
     );
     if (!customer) throw new Error("Billing profile could not be created.");
 
-    const checkout = await getStripe().checkout.sessions.create({
-      mode: "subscription",
-      customer: customer.stripeCustomerId,
-      line_items: [{ price: price.id, quantity: 1 }],
-      success_url: `${env.APP_URL}/app/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${env.APP_URL}/app/billing?checkout=canceled`,
-      client_reference_id: session.userId,
-      metadata: { userId: session.userId },
-      subscription_data: { metadata: { userId: session.userId } },
-      allow_promotion_codes: true,
-      after_expiration: { recovery: { enabled: true } },
-    });
+    const checkout = await getStripe().checkout.sessions.create(
+      {
+        mode: "subscription",
+        customer: customer.stripeCustomerId,
+        line_items: [{ price: price.id, quantity: 1 }],
+        success_url: `${env.APP_URL}/app/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${env.APP_URL}/app/billing?checkout=canceled`,
+        client_reference_id: session.userId,
+        metadata: { userId: session.userId },
+        subscription_data: { metadata: { userId: session.userId } },
+        allow_promotion_codes: true,
+        after_expiration: { recovery: { enabled: true } },
+      },
+      {
+        idempotencyKey: `luro-checkout-${session.userId}-${price.id}-${
+          existing && !Array.isArray(existing)
+            ? existing.stripeCheckoutSessionId ?? "new"
+            : "new"
+        }`,
+      },
+    );
     if (!checkout.url) {
       throw new Error("Stripe checkout session did not include a redirect URL.");
     }
 
+    await SubscriptionModel.findOneAndUpdate(
+      { userId: session.userId },
+      {
+        $set: {
+          stripeCheckoutSessionId: checkout.id,
+          stripeCheckoutSessionStatus: checkout.status,
+          stripeCheckoutUrl: checkout.url,
+        },
+      },
+      { new: true, runValidators: true },
+    );
     billingLog("info", "checkout_created", {
       requestId,
       userId,
