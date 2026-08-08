@@ -1,149 +1,150 @@
 "use client";
 
-import { PLANS } from "@/app/constant/pricing";
-import React, { useState } from "react";
+import { useEffect, useState } from "react";
+import { Check, CreditCard, LoaderCircle } from "lucide-react";
+import { PLANS, formatInterval, formatPrice, getPlanFeatures, type BillingCatalog } from "@/app/constant/pricing";
+import { apiRequest, getApiError } from "@/store/api";
 
 export default function Pricing() {
-  const [isYearly, setIsYearly] = useState(false);
+  const [catalog, setCatalog] = useState<BillingCatalog | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void apiRequest<BillingCatalog>("/api/stripe/catalog")
+      .then((result) => {
+        if (!cancelled) setCatalog(result);
+      })
+      .catch((error) => {
+        if (!cancelled)
+          setCatalogError(
+            getApiError(error, "Pricing is temporarily unavailable."),
+          );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const startCheckout = async () => {
+    setBusy(true);
+    try {
+      const result = await apiRequest<{ url: string }>("/api/stripe/checkout", {
+        method: "POST",
+        data: {},
+      });
+      window.location.assign(result.url);
+    } catch (error) {
+      setCatalogError(
+        getApiError(error, "Unable to start checkout. Please sign in and try again."),
+      );
+      setBusy(false);
+    }
+  };
 
   return (
-    <section className="relative w-full py-12 sm:py-20 px-4 sm:px-8 max-w-7xl mx-auto">
-      {/* Section Header */}
-      <div className="text-center mb-8 sm:mb-12">
-        <span className="px-3 py-1 text-xs font-semibold text-violet-400 bg-violet-500/10 border border-violet-500/20 rounded-full uppercase tracking-wider">
+    <section className="relative mx-auto w-full max-w-7xl px-4 py-12 sm:px-8 sm:py-20">
+      <div className="mb-8 text-center sm:mb-12">
+        <span className="rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-violet-400">
           Flexible Pricing
         </span>
-        <h2 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-white mt-4 tracking-tight">
+        <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-white sm:text-4xl md:text-5xl">
           Simple, Transparent Plans
         </h2>
-        <p className="text-slate-400 mt-3 text-sm sm:text-base max-w-2xl mx-auto">
-          Choose the plan that fits your growth strategy. Scale up or down at
-          any time.
+        <p className="mx-auto mt-3 max-w-2xl text-sm text-slate-400 sm:text-base">
+          Start with the core tools and upgrade when you need more monthly capacity.
         </p>
-
-        {/* Monthly / Yearly Billing Toggle */}
-        <div className="flex items-center justify-center gap-3 mt-8">
-          <span
-            className={`text-xs sm:text-sm font-medium ${
-              !isYearly ? "text-white" : "text-slate-400"
-            }`}
-          >
-            Monthly
-          </span>
-          <button
-            onClick={() => setIsYearly(!isYearly)}
-            className="relative w-12 h-6 rounded-full bg-slate-800 border border-violet-500/30 p-0.5 transition-colors duration-200 ease-in-out focus:outline-none"
-            aria-label="Toggle billing interval"
-          >
-            <div
-              className={`w-4 h-4 rounded-full bg-gradient-to-r from-violet-500 to-pink-500 shadow-md transform transition-transform duration-200 ease-in-out ${
-                isYearly ? "translate-x-6" : "translate-x-0"
-              }`}
-            />
-          </button>
-          <div className="flex items-center gap-1.5">
-            <span
-              className={`text-xs sm:text-sm font-medium ${
-                isYearly ? "text-white" : "text-slate-400"
-              }`}
-            >
-              Yearly
-            </span>
-            <span className="px-2 py-0.5 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
-              Save 20%
-            </span>
-          </div>
-        </div>
+        {catalogError && (
+          <p role="alert" className="mx-auto mt-4 max-w-xl text-sm text-amber-300">
+            {catalogError}
+          </p>
+        )}
       </div>
 
-      {/* Pricing Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {PLANS.map((plan) => {
-          const isPopular = plan.id === "pro";
-          const price = isYearly
-            ? Math.round(plan.yearlyPrice / 12)
-            : plan.monthlyPrice;
+          const isPro = plan.id === "pro";
+          const price = catalog?.proPrice;
+          const features = catalog
+            ? getPlanFeatures(plan.id, catalog.limits[plan.id])
+            : [];
 
           return (
             <div
               key={plan.id}
-              className={`relative rounded-2xl bg-gradient-to-b from-slate-900 via-slate-900/90 to-slate-950 border p-6 sm:p-8 flex flex-col justify-between transition-all duration-300 ${
-                isPopular
+              className={`relative flex flex-col justify-between rounded-2xl border bg-gradient-to-b from-slate-900 via-slate-900/90 to-slate-950 p-6 transition-all duration-300 sm:p-8 ${
+                isPro
                   ? "border-violet-500/60 shadow-xl shadow-violet-950/40 md:-translate-y-2"
-                  : "border-white/10 hover:border-violet-500/30"
+                  : "border-white/10"
               }`}
             >
-              {/* Popular / Custom Badge */}
               {plan.badge && (
                 <div className="absolute -top-3 right-6">
-                  <span
-                    className={`px-3 py-1 text-[11px] font-semibold rounded-full border shadow-sm ${
-                      isPopular
-                        ? "bg-gradient-to-r from-violet-600 to-pink-600 text-white border-violet-400/30"
-                        : "bg-slate-800 text-violet-300 border-violet-500/20"
-                    }`}
-                  >
+                  <span className="rounded-full border border-violet-400/30 bg-gradient-to-r from-violet-600 to-pink-600 px-3 py-1 text-[11px] font-semibold text-white shadow-sm">
                     {plan.badge}
                   </span>
                 </div>
               )}
-
-              {/* Top Section */}
               <div>
-                <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
-                  {plan.title}
-                </h3>
-                <p className="text-slate-400 text-xs sm:text-sm leading-relaxed mb-6 min-h-[40px]">
+                <h3 className="mb-2 text-xl font-bold text-white sm:text-2xl">{plan.title}</h3>
+                <p className="mb-6 min-h-10 text-xs leading-relaxed text-slate-400 sm:text-sm">
                   {plan.desc}
                 </p>
-
-                {/* Price Display */}
-                <div className="flex items-baseline gap-1 mb-6 pb-6 border-b border-white/10">
-                  <span className="text-3xl sm:text-5xl font-extrabold text-white">
-                    ${price}
-                  </span>
-                  <span className="text-slate-400 text-xs sm:text-sm font-medium">
-                    /month
-                  </span>
-                  {isYearly && plan.yearlyPrice > 0 && (
-                    <span className="text-[10px] text-slate-500 ml-auto block text-right">
-                      Billed ${plan.yearlyPrice}/yr
-                    </span>
+                <div className="mb-6 flex min-h-20 items-baseline gap-1 border-b border-white/10 pb-6">
+                  {isPro && price ? (
+                    <>
+                      <span className="text-3xl font-extrabold text-white sm:text-5xl">
+                        {formatPrice(price.unitAmount, price.currency)}
+                      </span>
+                      <span className="text-xs font-medium text-slate-400 sm:text-sm">
+                        / {price.intervalCount > 1 ? `${price.intervalCount} ` : ""}
+                        {formatInterval(price.interval)}
+                      </span>
+                    </>
+                  ) : isPro ? (
+                    <span className="text-sm text-slate-400">Price unavailable</span>
+                  ) : (
+                    <>
+                      <span className="text-3xl font-extrabold text-white sm:text-5xl">Free</span>
+                      <span className="text-xs font-medium text-slate-400 sm:text-sm">forever</span>
+                    </>
                   )}
                 </div>
-
-                {/* Features List */}
-                <div className="space-y-3 mb-8">
-                  <p className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-300">
                     What's included
                   </p>
-                  <ul className="space-y-2.5">
-                    {plan.features.map((feature, idx) => (
-                      <li
-                        key={idx}
-                        className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-300"
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-violet-400 mt-1.5 shrink-0" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  {catalog ? (
+                    <ul className="space-y-2.5">
+                      {features.map((feature) => (
+                        <li key={feature} className="flex items-start gap-2.5 text-xs text-slate-300 sm:text-sm">
+                          <Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-slate-500">Loading plan details...</p>
+                  )}
                 </div>
               </div>
-
-              {/* Action Button */}
-              <a
-                href={plan.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`w-full py-3 px-4 rounded-xl text-xs sm:text-sm font-semibold text-center transition-all duration-200 block shadow-md ${
-                  isPopular
-                    ? "bg-gradient-to-r from-violet-600 to-pink-600 hover:from-violet-500 hover:to-pink-500 text-white shadow-violet-900/50"
-                    : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/5"
+              <button
+                type="button"
+                disabled={busy || !catalog || (isPro && Boolean(catalogError))}
+                onClick={() => {
+                  if (isPro) void startCheckout();
+                  else window.location.assign("/auth/signup");
+                }}
+                className={`mt-8 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold shadow-md transition-all sm:text-sm ${
+                  isPro
+                    ? "bg-gradient-to-r from-violet-600 to-pink-600 text-white shadow-violet-900/50 hover:from-violet-500 hover:to-pink-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    : "border border-white/5 bg-slate-800 text-slate-200 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
                 }`}
               >
-                {plan.buttonText}
-              </a>
+                {busy && isPro && <LoaderCircle className="size-4 animate-spin" />}
+                {isPro ? (busy ? "Opening checkout..." : "Upgrade to Pro") : "Get Started"}
+              </button>
             </div>
           );
         })}
@@ -151,3 +152,6 @@ export default function Pricing() {
     </section>
   );
 }
+
+export { CreditCard };
+

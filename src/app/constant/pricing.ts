@@ -1,71 +1,73 @@
-type PLAN = {
-  id: string;
-  title: string;
-  desc: string;
-  monthlyPrice: number;
-  yearlyPrice: number;
-  badge?: string;
-  buttonText: string;
-  features: string[];
-  link: string;
+export type PlanId = "free" | "pro";
+
+export type BillingLimits = {
+  tokens: number;
+  images: number;
+  pages: number;
 };
 
-export const PLANS: PLAN[] = [
+export type BillingCatalog = {
+  configured: true;
+  proPrice: {
+    id: string;
+    currency: string;
+    unitAmount: number;
+    interval: "day" | "week" | "month" | "year";
+    intervalCount: number;
+  };
+  limits: Record<PlanId, BillingLimits>;
+};
+
+export type Plan = {
+  id: PlanId;
+  title: string;
+  desc: string;
+  badge?: string;
+};
+
+export const PLANS: Plan[] = [
   {
     id: "free",
     title: "Free",
-    desc: "Get started with essential tools for social media content creation",
-    monthlyPrice: 0,
-    yearlyPrice: 0,
-    buttonText: "Get Started",
-    features: [
-      "Basic AI content generation",
-      "4 social media integrations",
-      "Community support",
-      "1 project limit",
-      "Standard analytics",
-      "Basic image generation",
-    ],
-    link: "https://stripe.com/free-plan-link",
+    desc: "Get started with the core Luro AI creation tools.",
   },
   {
     id: "pro",
     title: "Pro",
-    desc: "Unlock advance features for enhanced content and strategy",
-    monthlyPrice: 10,
-    yearlyPrice: 120,
-    badge: "Most Popular",
-    buttonText: "Upgrade to Pro",
-    features: [
-      "Advanced AI content generation",
-      "10 social media integrations",
-      "Priority email support",
-      "10 project limit",
-      "Enhanced analytics & insights",
-      "Pro model image generation",
-      "Team collaboration tools",
-      "Custom branding options",
-    ],
-    link: "https://stripe.com/pro-plan-link",
-  },
-  {
-    id: "enterprise",
-    title: "Enterprise",
-    desc: "Tailored solutions for large organizations and agencies",
-    monthlyPrice: 15,
-    yearlyPrice: 180,
-    badge: "Contact Sales",
-    buttonText: "Upgrade to Enterprise",
-    features: [
-      "Unlimited AI content generation",
-      "All social media integrations",
-      "Dedicated account manager",
-      "Unlimited projects",
-      "Custom analytics & reporting",
-      "Enterprise-grade security",
-      "Free updates",
-      // "24/7 priority support"
-    ],
-    link: "https://stripe.com/enterprise-plan-link",
+    desc: "Higher monthly allowances for serious creative work.",
+    badge: "Recommended",
   },
 ];
+
+const compactNumber = new Intl.NumberFormat("en-US", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+export const getPlanFeatures = (
+  plan: PlanId,
+  limits?: BillingLimits,
+): string[] => {
+  if (!limits) return [];
+  const prefix = plan === "free" ? "Up to" : "Includes";
+  return [
+    `${prefix} ${compactNumber.format(limits.tokens)} AI tokens per month`,
+    `${prefix} ${compactNumber.format(limits.images)} generated images per month`,
+    `${prefix} ${compactNumber.format(limits.pages)} PDF pages per month`,
+    plan === "free" ? "Core AI creation tools" : "All AI creation tools",
+    plan === "free" ? "Standard processing" : "Higher usage capacity",
+  ];
+};
+
+export const formatPrice = (
+  unitAmount: number,
+  currency: string,
+): string =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+    minimumFractionDigits: unitAmount % 100 === 0 ? 0 : 2,
+  }).format(unitAmount / 100);
+
+export const formatInterval = (interval: BillingCatalog["proPrice"]["interval"]) =>
+  interval === "day" ? "day" : interval === "week" ? "week" : interval === "year" ? "year" : "month";
