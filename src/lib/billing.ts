@@ -115,31 +115,33 @@ export const getConfiguredProPrice = async (): Promise<BillingPrice> => {
     intervalCount: price.recurring.interval_count,
   };
 };
-
 export const getOrCreateCustomer = async (userId: string, email?: string) => {
   if (!userId) throw new Error("User ID is required to get or create customer.");
 
   await connectToDatabase();
-  const existing = await SubscriptionModel.findOne({ userId });
 
-  if (existing?.stripeCustomerId) {
+  // 1. Check existing subscription in DB
+  let subscription = await SubscriptionModel.findOne({ userId });
+
+  // 2. If valid Stripe customer ID exists, verify with Stripe
+  if (subscription?.stripeCustomerId) {
     try {
       const customer = await getStripe().customers.retrieve(
-        existing.stripeCustomerId,
+        subscription.stripeCustomerId,
       );
-      if (!customer.deleted) return existing;
+      if (!customer.deleted) return subscription;
     } catch (error: any) {
       if (error?.code !== "resource_missing") {
         throw error;
       }
       billingLog("info", "stale_customer_replaced", {
         userId,
-        stripeCustomerId: existing.stripeCustomerId,
+        stripeCustomerId: subscription.stripeCustomerId,
       });
     }
   }
 
-  // Safe email handle (agar email empty/undefined ho)
+  // 3. Create new customer in Stripe
   const customerPayload: Stripe.CustomerCreateParams = {
     metadata: { userId },
   };
@@ -149,26 +151,25 @@ export const getOrCreateCustomer = async (userId: string, email?: string) => {
 
   const customer = await getStripe().customers.create(
     customerPayload,
-    { idempotencyKey: `luro-customer-${userId}` },
+    { idempotencyKey: `luro-customer-${userId}` }
   );
 
-  const updatedDoc = await SubscriptionModel.findOneAndUpdate(
-    { userId },
-    {
-      $set: { stripeCustomerId: customer.id },
-      $setOnInsert: {
-        userId,
-        plan: "free",
-        status: "inactive",
-        entitled: false,
-      },
-    },
-    { upsert: true, new: true, runValidators: true },
-  );
+  // 4. Save to Database using Direct Document Operations (NO findOneAndUpdate)
+  if (subscription) {
+    subscription.stripeCustomerId = customer.id;
+    await subscription.save();
+  } else {
+    subscription = await SubscriptionModel.create({
+      userId,
+      stripeCustomerId: customer.id,
+      plan: "free",
+      status: "inactive",
+      entitled: false,
+    });
+  }
 
-  return updatedDoc;
+  return subscription;
 };
-
 export const syncStripeCheckoutSession = async (
   checkout: Stripe.Checkout.Session,
 ) => {

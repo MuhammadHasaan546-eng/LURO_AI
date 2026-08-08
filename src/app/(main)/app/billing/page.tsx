@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   Check,
   CreditCard,
@@ -56,15 +57,37 @@ const statusText: Record<Subscription["status"], string> = {
 };
 
 export default function BillingPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const sessionId = searchParams.get("session_id");
+
   const subscription = useApiData<Subscription>("/api/stripe/subscription", {
     plan: "free",
     status: "inactive",
     currentPeriodEnd: null,
     cancelAtPeriodEnd: false,
   });
+  
   const [catalog, setCatalog] = useState<BillingCatalog | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // 1. Stripe redirect handling with auto-retry
+  useEffect(() => {
+    if (sessionId) {
+      toast.success("Payment successful! Updating your subscription...");
+      // Re-fetch latest subscription status from DB
+      subscription.retry();
+
+      const timer = setTimeout(() => {
+        subscription.retry();
+        // Clear session_id from URL without refreshing the page
+        router.replace("/app/billing");
+      }, 1500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [sessionId]);
 
   useEffect(() => {
     void apiRequest<BillingCatalog>("/api/stripe/catalog")
@@ -255,4 +278,3 @@ export default function BillingPage() {
     </DashboardPage>
   );
 }
-

@@ -304,6 +304,10 @@ export const DocumentQuestionModel = model(
 export const UsageModel = model("Usage", usageSchema);
 export const SubscriptionModel = model("Subscription", subscriptionSchema);
 
+// Existing non-sparse index ko automatically clean karne ke liye:
+SubscriptionModel.collection.dropIndex("stripeSubscriptionId_1").catch(() => {
+  // Safe fallback agar index pehle se drop ho chuka ho
+});
 export const productModels = [
   ChatModel,
   GenerationModel,
