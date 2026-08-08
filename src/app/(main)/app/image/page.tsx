@@ -48,13 +48,14 @@ export default function ImagePage() {
   const history = useApiData<AiImage[]>("/api/ai/image?limit=12", []);
   const [result, setResult] = useState<AiImage | null>(null);
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("general");
 
   const generate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
     const form = new FormData(event.currentTarget);
-    form.set("category", selectedCategory); // Append selected category from state
+    form.set("category", selectedCategory);
 
     try {
       const image = await apiRequest<AiImage>("/api/ai/image", {
@@ -89,6 +90,31 @@ export default function ImagePage() {
     }
   };
 
+  // Direct Download Handler (Fixes Cross-Origin Download Issue)
+  const handleDownload = async () => {
+    if (!result?.secureUrl) return;
+    setDownloading(true);
+    try {
+      const response = await fetch(result.secureUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.style.display = "none";
+      a.href = url;
+      a.download = `ai-image-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Image downloaded successfully!");
+    } catch (error) {
+      toast.error("Failed to download image directly. Opening in new tab.");
+      window.open(result.secureUrl, "_blank");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const formContent = (
     <form onSubmit={generate} className="space-y-6">
       <Field label="Describe your image">
@@ -102,7 +128,6 @@ export default function ImagePage() {
         />
       </Field>
 
-      {/* Shadcn UI Style Category Selector */}
       <Field label="Category">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {CATEGORIES.map((cat) => {
@@ -189,16 +214,20 @@ export default function ImagePage() {
             <RefreshCw className="size-3.5 mr-1.5" />
             Regenerate
           </Button>
-          <Button asChild size="sm" className="bg-white text-black hover:bg-white/90">
-            <a
-              href={result.secureUrl}
-              download
-              target="_blank"
-              rel="noreferrer"
-            >
+
+          {/* Fixed Download Button with Blob Handling */}
+          <Button
+            size="sm"
+            disabled={downloading}
+            onClick={handleDownload}
+            className="bg-white text-black hover:bg-white/90"
+          >
+            {downloading ? (
+              <LoaderCircle className="size-3.5 mr-1.5 animate-spin" />
+            ) : (
               <Download className="size-3.5 mr-1.5" />
-              Download
-            </a>
+            )}
+            {downloading ? "Downloading..." : "Download"}
           </Button>
         </div>
       </CardContent>

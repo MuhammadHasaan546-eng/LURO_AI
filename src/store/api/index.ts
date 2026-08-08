@@ -1,9 +1,28 @@
 import axios, { isAxiosError, type AxiosRequestConfig } from "axios";
 
-type ApiEnvelope<T> = {
+export type ApiEnvelope<T> = {
   success: true;
   message: string;
   data: T;
+};
+
+export const unwrapApiResponse = <T>(body: T | ApiEnvelope<T>): T => {
+  if (
+    typeof body !== "object" ||
+    body === null ||
+    !("success" in body) ||
+    body.success !== true ||
+    !("data" in body)
+  ) {
+    return body as T;
+  }
+
+  const envelope = body as ApiEnvelope<T>;
+  if (Array.isArray(envelope.data)) return envelope.data;
+  if (typeof envelope.data === "object" && envelope.data !== null) {
+    return { ...envelope.data, message: envelope.message } as T;
+  }
+  return envelope.data;
 };
 
 export type ApiError = {
@@ -50,20 +69,7 @@ export const apiRequest = async <T>(
       ...config,
       headers: { Accept: "application/json", ...config.headers },
     });
-    const body = response.data;
-    if (
-      typeof body === "object" &&
-      body !== null &&
-      "success" in body &&
-      body.success === true &&
-      "data" in body
-    ) {
-      const envelope = body as ApiEnvelope<T>;
-      if (typeof envelope.data === "object" && envelope.data !== null)
-        return { ...envelope.data, message: envelope.message } as T;
-      return envelope.data;
-    }
-    return body as T;
+    return unwrapApiResponse(response.data);
   } catch (error) {
     if (isAxiosError(error)) {
       const responseError = error.response?.data as

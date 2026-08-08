@@ -311,7 +311,7 @@ export const db = {
         {
           userId: where.userId,
           revokedAt: null,
-          expiresAt: { $gt: where.expiresAt.gt },
+          expiresAt: mongoose.trusted({ $gt: where.expiresAt.gt }),
         },
         projection(select),
       )
