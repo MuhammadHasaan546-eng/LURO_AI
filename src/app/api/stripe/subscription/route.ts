@@ -14,6 +14,7 @@ export async function GET() {
       subscription ?? {
         plan: "free",
         status: "inactive",
+        entitled: false,
         cancelAtPeriodEnd: false,
       },
       "Subscription loaded.",

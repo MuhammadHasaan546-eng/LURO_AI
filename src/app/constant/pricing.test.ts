@@ -53,5 +53,13 @@ describe("billing pricing contract", () => {
         configuredPriceId: "price_pro",
       }),
     ).toBe(false);
+    expect(
+      hasProEntitlementForPrice({
+        plan: "pro",
+        status: "active",
+        stripePriceId: "price_pro",
+        configuredPriceId: null,
+      }),
+    ).toBe(false);
   });
 });
