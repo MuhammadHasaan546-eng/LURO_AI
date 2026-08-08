@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, CreditCard, LoaderCircle } from "lucide-react";
+import { Check, LoaderCircle } from "lucide-react";
 import { PLANS, formatInterval, formatPrice, getPlanFeatures, type BillingCatalog } from "@/app/constant/pricing";
 import { apiRequest, getApiError } from "@/store/api";
 
@@ -152,6 +152,4 @@ export default function Pricing() {
     </section>
   );
 }
-
-export { CreditCard };
 
