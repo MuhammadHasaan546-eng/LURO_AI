@@ -1,11 +1,17 @@
 import type Stripe from "stripe";
+import { randomUUID } from "node:crypto";
 import { env } from "@/lib/env";
 import { getStripe } from "@/lib/ai/providers";
-import { syncStripeSubscription } from "@/lib/billing";
+import {
+  billingLog,
+  stripeErrorContext,
+  syncStripeSubscription,
+} from "@/lib/billing";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const requestId = request.headers.get("x-request-id") ?? randomUUID();
   if (!env.STRIPE_WEBHOOK_SECRET)
     return Response.json(
       { success: false, code: "BILLING_NOT_CONFIGURED" },
@@ -24,12 +30,21 @@ export async function POST(request: Request) {
       signature,
       env.STRIPE_WEBHOOK_SECRET,
     );
-  } catch {
+  } catch (error) {
+    billingLog("error", "webhook_signature_invalid", {
+      requestId,
+      ...stripeErrorContext(error),
+    });
     return Response.json(
       { success: false, code: "SIGNATURE_INVALID" },
       { status: 400 },
     );
   }
+  billingLog("info", "webhook_received", {
+    requestId,
+    eventId: event.id,
+    eventType: event.type,
+  });
   try {
     if (
       [
@@ -41,10 +56,12 @@ export async function POST(request: Request) {
       await syncStripeSubscription(event.data.object as Stripe.Subscription);
     return Response.json({ received: true });
   } catch (error) {
-    console.error(
-      "Stripe webhook processing failed",
-      error instanceof Error ? error.name : "UnknownError",
-    );
+    billingLog("error", "webhook_processing_failed", {
+      requestId,
+      eventId: event.id,
+      eventType: event.type,
+      ...stripeErrorContext(error),
+    });
     return Response.json(
       { success: false, code: "WEBHOOK_PROCESSING_FAILED" },
       { status: 500 },

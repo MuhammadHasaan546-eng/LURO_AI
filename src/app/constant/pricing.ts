@@ -7,14 +7,14 @@ export type BillingLimits = {
 };
 
 export type BillingCatalog = {
-  configured: true;
+  configured: boolean;
   proPrice: {
     id: string;
     currency: string;
     unitAmount: number;
     interval: "day" | "week" | "month" | "year";
     intervalCount: number;
-  };
+  } | null;
   limits: Record<PlanId, BillingLimits>;
 };
 
@@ -69,5 +69,13 @@ export const formatPrice = (
     minimumFractionDigits: unitAmount % 100 === 0 ? 0 : 2,
   }).format(unitAmount / 100);
 
-export const formatInterval = (interval: BillingCatalog["proPrice"]["interval"]) =>
-  interval === "day" ? "day" : interval === "week" ? "week" : interval === "year" ? "year" : "month";
+export const formatInterval = (
+  interval: NonNullable<BillingCatalog["proPrice"]>["interval"],
+) =>
+  interval === "day"
+    ? "day"
+    : interval === "week"
+      ? "week"
+      : interval === "year"
+        ? "year"
+        : "month";

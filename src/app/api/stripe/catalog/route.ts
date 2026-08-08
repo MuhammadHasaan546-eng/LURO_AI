@@ -14,7 +14,7 @@ export async function GET() {
     const price = await getConfiguredProPrice();
     return successResponse(
       {
-        configured: true as const,
+        configured: true,
         proPrice: price,
         limits: {
           free: {
@@ -34,7 +34,25 @@ export async function GET() {
   } catch (error) {
     billingLog("error", "catalog_load_failed", stripeErrorContext(error));
     if (error instanceof BillingConfigurationError) {
-      return errorResponse(error.code, error.message, error.status);
+      return successResponse(
+        {
+          configured: false,
+          proPrice: null,
+          limits: {
+            free: {
+              tokens: env.APP_FREE_MONTHLY_TOKENS,
+              images: env.APP_FREE_MONTHLY_IMAGES,
+              pages: env.APP_FREE_MONTHLY_PDF_PAGES,
+            },
+            pro: {
+              tokens: env.APP_PRO_MONTHLY_TOKENS,
+              images: env.APP_PRO_MONTHLY_IMAGES,
+              pages: env.APP_PRO_MONTHLY_PDF_PAGES,
+            },
+          },
+        },
+        "Free plan details loaded; Pro billing is unavailable.",
+      );
     }
     return errorResponse(
       "BILLING_CATALOG_UNAVAILABLE",

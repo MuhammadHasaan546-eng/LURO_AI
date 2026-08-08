@@ -224,8 +224,16 @@ const subscriptionSchema = new Schema(
     id: idField,
     userId: ownerField,
     stripeCustomerId: { type: String, required: true, maxlength: 255 },
+    stripeCheckoutSessionId: { type: String, default: null, maxlength: 255 },
+    stripeCheckoutSessionStatus: {
+      type: String,
+      enum: ["open", "complete", "expired", null],
+      default: null,
+    },
+    stripeCheckoutUrl: { type: String, default: null, maxlength: 2048 },
     stripeSubscriptionId: { type: String, default: null, maxlength: 255 },
     stripePriceId: { type: String, default: null, maxlength: 255 },
+    entitled: { type: Boolean, default: false, required: true },
     plan: {
       type: String,
       enum: ["free", "pro"],
@@ -256,6 +264,7 @@ const subscriptionSchema = new Schema(
 subscriptionSchema.index({ id: 1 }, { unique: true });
 subscriptionSchema.index({ userId: 1 }, { unique: true });
 subscriptionSchema.index({ stripeCustomerId: 1 }, { unique: true });
+subscriptionSchema.index({ stripeCheckoutSessionId: 1 }, { unique: true, sparse: true });
 subscriptionSchema.index(
   { stripeSubscriptionId: 1 },
   { unique: true, sparse: true },

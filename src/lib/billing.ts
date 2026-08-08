@@ -14,6 +14,19 @@ export type BillingPrice = {
   intervalCount: number;
 };
 
+export const PRO_SUBSCRIPTION_STATUSES = ["active", "trialing"] as const;
+
+export const hasProEntitlement = (input: {
+  plan?: string | null;
+  status?: string | null;
+  stripePriceId?: string | null;
+}) =>
+  input.plan === "pro" &&
+  PRO_SUBSCRIPTION_STATUSES.includes(
+    input.status as (typeof PRO_SUBSCRIPTION_STATUSES)[number],
+  ) &&
+  input.stripePriceId === env.STRIPE_PRO_PRICE_ID;
+
 export class BillingConfigurationError extends Error {
   readonly code = "BILLING_CONFIGURATION_INVALID";
   readonly status = 503;
@@ -126,10 +139,66 @@ export const getOrCreateCustomer = async (userId: string, email: string) => {
     { userId },
     {
       $set: { stripeCustomerId: customer.id },
-      $setOnInsert: { userId, plan: "free", status: "inactive" },
+      $setOnInsert: {
+        userId,
+        plan: "free",
+        status: "inactive",
+        entitled: false,
+      },
     },
     { upsert: true, new: true, runValidators: true },
   );
+};
+
+export const syncStripeCheckoutSession = async (
+  checkout: Stripe.Checkout.Session,
+) => {
+  const customerId =
+    typeof checkout.customer === "string"
+      ? checkout.customer
+      : checkout.customer?.id;
+  await connectToDatabase();
+  const existing = customerId
+    ? await SubscriptionModel.findOne({ stripeCustomerId: customerId }).lean()
+    : null;
+  const userId =
+    checkout.metadata?.userId ||
+    checkout.client_reference_id ||
+    (existing && !Array.isArray(existing) ? existing.userId : undefined);
+  if (!userId) {
+    billingLog("error", "checkout_user_missing", {
+      checkoutSessionId: checkout.id,
+      stripeCustomerId: customerId,
+    });
+    return;
+  }
+
+  await SubscriptionModel.findOneAndUpdate(
+    { userId },
+    {
+      $set: {
+        ...(customerId ? { stripeCustomerId: customerId } : {}),
+        stripeCheckoutSessionId: checkout.id,
+        stripeCheckoutSessionStatus: checkout.status,
+        stripeCheckoutUrl: checkout.url ?? null,
+        ...(typeof checkout.subscription === "string"
+          ? { stripeSubscriptionId: checkout.subscription }
+          : {}),
+      },
+      $setOnInsert: {
+        userId,
+        plan: "free",
+        status: "inactive",
+        entitled: false,
+      },
+    },
+    { upsert: true, new: true, runValidators: true },
+  );
+  billingLog("info", "checkout_session_synced", {
+    userId,
+    checkoutSessionId: checkout.id,
+    status: checkout.status,
+  });
 };
 
 export const syncStripeSubscription = async (
@@ -155,7 +224,11 @@ export const syncStripeSubscription = async (
   }
   const item = subscription.items.data[0];
   const periodEnd = item?.current_period_end;
-  const active = ["active", "trialing"].includes(subscription.status);
+  const entitled = hasProEntitlement({
+    plan: "pro",
+    status: subscription.status,
+    stripePriceId: item?.price.id,
+  });
   await SubscriptionModel.findOneAndUpdate(
     { userId },
     {
@@ -163,8 +236,8 @@ export const syncStripeSubscription = async (
         stripeCustomerId: customerId,
         stripeSubscriptionId: subscription.id,
         stripePriceId: item?.price.id ?? null,
-        plan:
-          active && item?.price.id === env.STRIPE_PRO_PRICE_ID ? "pro" : "free",
+        plan: entitled ? "pro" : "free",
+        entitled,
         status: subscription.status,
         currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
@@ -176,6 +249,7 @@ export const syncStripeSubscription = async (
     userId,
     stripeSubscriptionId: subscription.id,
     status: subscription.status,
-    plan: active && item?.price.id === env.STRIPE_PRO_PRICE_ID ? "pro" : "free",
+    plan: entitled ? "pro" : "free",
+    entitled,
   });
 };

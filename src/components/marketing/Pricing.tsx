@@ -113,7 +113,7 @@ export default function Pricing() {
                 </div>
                 <div className="space-y-3">
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-300">
-                    What's included
+                    Included features
                   </p>
                   {catalog ? (
                     <ul className="space-y-2.5">
@@ -131,10 +131,19 @@ export default function Pricing() {
               </div>
               <button
                 type="button"
-                disabled={busy || !catalog || (isPro && Boolean(catalogError))}
+                disabled={busy || !catalog}
                 onClick={() => {
-                  if (isPro) void startCheckout();
-                  else window.location.assign("/auth/signup");
+                  if (!isPro) {
+                    window.location.assign("/auth/signup");
+                    return;
+                  }
+                  if (!catalog?.proPrice) {
+                    setCatalogError(
+                      "Pro checkout is unavailable until a valid Stripe Price ID is configured.",
+                    );
+                    return;
+                  }
+                  void startCheckout();
                 }}
                 className={`mt-8 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold shadow-md transition-all sm:text-sm ${
                   isPro
@@ -143,7 +152,13 @@ export default function Pricing() {
                 }`}
               >
                 {busy && isPro && <LoaderCircle className="size-4 animate-spin" />}
-                {isPro ? (busy ? "Opening checkout..." : "Upgrade to Pro") : "Get Started"}
+                {isPro
+                  ? busy
+                    ? "Opening checkout..."
+                    : catalog?.proPrice
+                      ? "Upgrade to Pro"
+                      : "Pro unavailable"
+                  : "Get Started"}
               </button>
             </div>
           );

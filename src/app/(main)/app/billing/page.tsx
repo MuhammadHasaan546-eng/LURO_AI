@@ -182,7 +182,7 @@ export default function BillingPage() {
                           : "Get started with the core Luro AI creation tools."}
                       </p>
                       <div className="my-6 flex min-h-20 items-baseline gap-1.5 border-b border-white/10 pb-6">
-                        {isPro ? (
+                        {isPro && price ? (
                           <>
                             <span className="text-4xl font-extrabold text-foreground">
                               {formatPrice(price.unitAmount, price.currency)}
@@ -192,6 +192,10 @@ export default function BillingPage() {
                               {formatInterval(price.interval)}
                             </span>
                           </>
+                        ) : isPro ? (
+                          <span className="text-sm text-muted-foreground">
+                            Price unavailable
+                          </span>
                         ) : (
                           <>
                             <span className="text-4xl font-extrabold text-foreground">Free</span>
@@ -201,7 +205,7 @@ export default function BillingPage() {
                       </div>
                       <div className="space-y-3">
                         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          What's included
+                          Included features
                         </p>
                         <ul className="space-y-2.5 text-sm text-muted-foreground">
                           {planFeatures.map((feature) => (
@@ -222,7 +226,14 @@ export default function BillingPage() {
                       variant={isPro && !isCurrentPlan ? "default" : "outline"}
                       disabled={busy || isCurrentPlan || !isPro}
                       onClick={() => {
-                        if (isPro) void billingAction("/api/stripe/checkout");
+                        if (!isPro) return;
+                        if (!price) {
+                          toast.error(
+                            "Pro checkout is unavailable until a valid Stripe Price ID is configured.",
+                          );
+                          return;
+                        }
+                        void billingAction("/api/stripe/checkout");
                       }}
                     >
                       {busy && isPro ? (
@@ -235,7 +246,9 @@ export default function BillingPage() {
                         : busy && isPro
                         ? "Processing..."
                         : isPro
-                        ? "Upgrade to Pro"
+                        ? price
+                          ? "Upgrade to Pro"
+                          : "Pro unavailable"
                         : "Included"}
                     </Button>
                   </CardContent>
