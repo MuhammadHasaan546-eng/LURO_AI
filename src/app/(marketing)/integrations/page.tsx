@@ -333,7 +333,7 @@ export default function IntegrationsPage(): React.ReactElement {
         >
           <div className="space-y-2 text-center md:text-left">
             <h3 className="text-xl md:text-2xl font-bold text-white">
-              Don't see the tool you use?
+              {"Don't see the tool you use?"}
             </h3>
             <p className="text-slate-400 text-xs md:text-sm max-w-xl">
               We frequently add new API connectors. Request an integration and our team will prioritize it for upcoming releases.

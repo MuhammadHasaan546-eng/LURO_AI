@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
+import { env } from "@/lib/env";
 import { getStripe } from "@/lib/ai/providers";
 import { requireAiSession } from "@/lib/ai/http";
 import {
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
     }
 
     const stripe = getStripe();
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const appUrl = env.APP_URL;
     const checkout = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customer.stripeCustomerId,

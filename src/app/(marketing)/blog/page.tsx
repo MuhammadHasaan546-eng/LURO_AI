@@ -390,7 +390,7 @@ export default function BlogPage(): React.ReactElement {
           <div className="w-full md:w-auto shrink-0">
             {subscribed ? (
               <div className="px-6 py-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold text-center">
-                ✓ You're subscribed! Check your inbox soon.
+                {"✓ You're subscribed! Check your inbox soon."}
               </div>
             ) : (
               <form

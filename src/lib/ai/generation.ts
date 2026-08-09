@@ -39,10 +39,10 @@ export const completeText = async (input: {
   const response = await fetch(`${env.OPENROUTER_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${env.OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-      "X-Title": "Aipass AI Saas",
+      "HTTP-Referer": env.APP_URL,
+      "X-Title": "Luro AI",
     },
     body: JSON.stringify({
       model: env.OPENROUTER_CHAT_MODEL,
@@ -115,8 +115,10 @@ export const embedTexts = async (texts: string[]) => {
   const response = await fetch(`${env.OPENROUTER_BASE_URL}/embeddings`, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${env.OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
+      "HTTP-Referer": env.APP_URL,
+      "X-Title": "Luro AI",
     },
     body: JSON.stringify({
       model: env.OPENROUTER_EMBEDDING_MODEL,

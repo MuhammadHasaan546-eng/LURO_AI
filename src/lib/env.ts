@@ -58,7 +58,7 @@ const environmentSchema = Joi.object({
     .max(2048),
   EMAIL_WEBHOOK_SECRET: Joi.string().min(16).max(2048),
   
-  // OpenRouter Configuration
+  // OpenAI-compatible provider configuration. OpenRouter is the canonical deployment.
   OPENROUTER_API_KEY: Joi.string().min(1).max(2048),
   OPENROUTER_BASE_URL: Joi.string()
     .uri({ scheme: ["https"] })

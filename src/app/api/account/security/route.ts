@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { deleteCurrentSession, requireCsrf } from "@/lib/auth";
+import { getCloudinary } from "@/lib/ai/providers";
 import { db } from "@/lib/db";
+import { connectToDatabase } from "@/lib/mongoose";
+import { ImageModel } from "@/models";
 
 export async function POST(request: Request) {
   try {
@@ -28,7 +31,29 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ message: "Invalid request." }, { status: 403 });
     }
 
+    await connectToDatabase();
+    const images = await ImageModel.find({ userId: session.userId })
+      .select("cloudinaryPublicId")
+      .lean();
+
     await db.user.delete({ where: { id: session.userId } });
+
+    if (images.length > 0) {
+      try {
+        const cloudinary = getCloudinary();
+        await Promise.allSettled(
+          images.map((image) =>
+            cloudinary.uploader.destroy(image.cloudinaryPublicId, {
+              resource_type: "image",
+              invalidate: true,
+            }),
+          ),
+        );
+      } catch (storageError) {
+        console.error("Account image cleanup failed:", storageError);
+      }
+    }
+
     await deleteCurrentSession();
 
     return NextResponse.json({ message: "Account deleted." });

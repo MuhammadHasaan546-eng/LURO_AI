@@ -24,7 +24,7 @@ export default function Perks() {
 
           <div className="bg-slate-950/80 p-3 rounded-lg border border-white/5 text-xs text-slate-300">
             <p className="text-[10px] text-slate-500 mb-1">Live Agent</p>
-            "We've optimized your publishing queue for peak engagement tonight!"
+            {"\"We've optimized your publishing queue for peak engagement tonight!\""}
           </div>
         </div>
       ),

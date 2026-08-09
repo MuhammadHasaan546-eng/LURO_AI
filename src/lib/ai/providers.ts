@@ -37,7 +37,7 @@ export const getCloudinary = () => {
 };
 
 export const getStripe = (): Stripe => {
-  const secretKey = env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
+  const secretKey = env.STRIPE_SECRET_KEY;
 
   if (!secretKey) {
     throw new ProviderConfigurationError("Stripe");

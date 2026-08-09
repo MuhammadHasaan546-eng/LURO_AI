@@ -16,7 +16,7 @@ export default function Features() {
 
           <div className="text-xs font-mono text-violet-300 bg-violet-950/60 p-2 rounded-lg border border-violet-500/30">
             <span className="truncate block">
-              "Generate 5 viral tweets for SaaS launch..."
+              {"\"Generate 5 viral tweets for SaaS launch...\""}
             </span>
           </div>
 
