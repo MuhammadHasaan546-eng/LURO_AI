@@ -238,6 +238,13 @@ const subscriptionSchema = new Schema(
     },
     stripeSubscriptionId: { type: String, default: null, maxlength: 255 },
     stripePriceId: { type: String, default: null, maxlength: 255 },
+    latestInvoiceId: { type: String, default: null, maxlength: 255 },
+    latestPaymentStatus: {
+      type: String,
+      enum: ["none", "paid", "failed", "refunded", "partially_refunded"],
+      default: "none",
+      required: true,
+    },
     entitled: { type: Boolean, default: false, required: true },
     plan: {
       type: String,
@@ -261,8 +268,14 @@ const subscriptionSchema = new Schema(
       default: "inactive",
       required: true,
     },
+    currentPeriodStart: { type: Date, default: null },
     currentPeriodEnd: { type: Date, default: null },
+    cancelAt: { type: Date, default: null },
+    canceledAt: { type: Date, default: null },
+    endedAt: { type: Date, default: null },
     cancelAtPeriodEnd: { type: Boolean, default: false },
+    lastStripeEventId: { type: String, default: null, maxlength: 255 },
+    lastStripeEventCreated: { type: Number, default: 0, min: 0 },
   },
   schemaOptions,
 );
@@ -275,6 +288,24 @@ subscriptionSchema.index(
   { unique: true, sparse: true },
 );
 
+const stripeWebhookEventSchema = new Schema(
+  {
+    id: { type: String, required: true, immutable: true, maxlength: 255 },
+    type: { type: String, required: true, maxlength: 255 },
+    status: {
+      type: String,
+      enum: ["processing", "processed", "failed"],
+      default: "processing",
+      required: true,
+    },
+    processedAt: { type: Date, default: null },
+    error: { type: String, default: null, maxlength: 1_000 },
+  },
+  schemaOptions,
+);
+stripeWebhookEventSchema.index({ id: 1 }, { unique: true });
+stripeWebhookEventSchema.index({ createdAt: 1 }, { expireAfterSeconds: 2_592_000 });
+
 export type Chat = InferSchemaType<typeof chatSchema>;
 export type Generation = InferSchemaType<typeof generationSchema>;
 export type Email = InferSchemaType<typeof emailSchema>;
@@ -285,6 +316,7 @@ export type DocumentChunk = InferSchemaType<typeof documentChunkSchema>;
 export type DocumentQuestion = InferSchemaType<typeof documentQuestionSchema>;
 export type Usage = InferSchemaType<typeof usageSchema>;
 export type Subscription = InferSchemaType<typeof subscriptionSchema>;
+export type StripeWebhookEvent = InferSchemaType<typeof stripeWebhookEventSchema>;
 
 const model = <T>(name: string, schema: Schema<T>): Model<T> =>
   (mongoose.models[name] as Model<T> | undefined) ??
@@ -303,11 +335,10 @@ export const DocumentQuestionModel = model(
 );
 export const UsageModel = model("Usage", usageSchema);
 export const SubscriptionModel = model("Subscription", subscriptionSchema);
-
-// Existing non-sparse index ko automatically clean karne ke liye:
-SubscriptionModel.collection.dropIndex("stripeSubscriptionId_1").catch(() => {
-  // Safe fallback agar index pehle se drop ho chuka ho
-});
+export const StripeWebhookEventModel = model(
+  "StripeWebhookEvent",
+  stripeWebhookEventSchema,
+);
 export const productModels = [
   ChatModel,
   GenerationModel,
@@ -319,4 +350,5 @@ export const productModels = [
   DocumentQuestionModel,
   UsageModel,
   SubscriptionModel,
+  StripeWebhookEventModel,
 ];

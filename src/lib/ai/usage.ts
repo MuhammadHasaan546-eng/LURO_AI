@@ -25,6 +25,11 @@ export type UsageFeature =
 export const currentPeriod = (date = new Date()) =>
   date.toISOString().slice(0, 7);
 
+const calendarPeriodBounds = (date = new Date()) => ({
+  start: new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1)),
+  end: new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)),
+});
+
 const limits = {
   free: {
     tokens: env.APP_FREE_MONTHLY_TOKENS,
@@ -38,29 +43,67 @@ const limits = {
   },
 } as const;
 
-export const getPlan = async (userId: string) => {
+export const getBillingAccess = async (userId: string) => {
   await connectToDatabase();
   const subscription = (await SubscriptionModel.findOne({
     userId,
   }).lean()) as Subscription | null;
-  return subscription && hasProEntitlement(subscription)
-    ? "pro"
-    : "free";
+  const entitled = Boolean(subscription && hasProEntitlement(subscription));
+  const calendar = calendarPeriodBounds();
+  const periodStart =
+    entitled && subscription?.currentPeriodStart
+      ? new Date(subscription.currentPeriodStart)
+      : calendar.start;
+  const periodEnd =
+    entitled && subscription?.currentPeriodEnd
+      ? new Date(subscription.currentPeriodEnd)
+      : calendar.end;
+  return {
+    plan: entitled ? ("pro" as const) : ("free" as const),
+    entitled,
+    subscription,
+    periodStart,
+    periodEnd,
+  };
 };
+
+export const getPlan = async (userId: string) =>
+  (await getBillingAccess(userId)).plan;
 
 export const usageSummary = async (userId: string) => {
   await connectToDatabase();
-  const period = currentPeriod();
-  const [plan, totals] = await Promise.all([
-    getPlan(userId),
-    UsageModel.aggregate<{ _id: UsageUnit; quantity: number }>([
-      { $match: { userId, period } },
-      { $group: { _id: "$unit", quantity: { $sum: "$quantity" } } },
-    ]),
+  const access = await getBillingAccess(userId);
+  const totals = await UsageModel.aggregate<{
+    _id: UsageUnit;
+    quantity: number;
+  }>([
+    {
+      $match: {
+        userId,
+        createdAt: { $gte: access.periodStart, $lt: access.periodEnd },
+      },
+    },
+    { $group: { _id: "$unit", quantity: { $sum: "$quantity" } } },
   ]);
   const used = { tokens: 0, images: 0, pages: 0 };
   for (const total of totals) used[total._id] = total.quantity;
-  return { period, plan, used, limits: limits[plan] };
+  const planLimits = limits[access.plan];
+  return {
+    period: currentPeriod(access.periodStart),
+    periodStart: access.periodStart.toISOString(),
+    periodEnd: access.periodEnd.toISOString(),
+    plan: access.plan,
+    entitled: access.entitled,
+    status: access.subscription?.status ?? "inactive",
+    cancelAtPeriodEnd: Boolean(access.subscription?.cancelAtPeriodEnd),
+    used,
+    limits: planLimits,
+    remaining: {
+      tokens: Math.max(0, planLimits.tokens - used.tokens),
+      images: Math.max(0, planLimits.images - used.images),
+      pages: Math.max(0, planLimits.pages - used.pages),
+    },
+  };
 };
 
 export const assertUsageAvailable = async (
@@ -93,6 +136,8 @@ export const recordUsage = async (input: {
 
 export const enforceAiRateLimit = async (userId: string, action: string) => {
   await connectToDatabase();
+  const plan = await getPlan(userId);
+  const capacity = plan === "pro" ? 100 : 20;
   const now = new Date();
   const windowStart = new Date(Math.floor(now.getTime() / 60_000) * 60_000);
   const id = `ai:${action}:${userId}:${windowStart.toISOString()}`;
@@ -104,7 +149,7 @@ export const enforceAiRateLimit = async (userId: string, action: string) => {
     },
     { upsert: true, new: true, runValidators: true },
   ).lean()) as RateLimitBucket | null;
-  if (bucket && bucket.count > 20)
+  if (bucket && bucket.count > capacity)
     throw new HttpError(
       429,
       "RATE_LIMITED",

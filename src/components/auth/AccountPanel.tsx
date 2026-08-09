@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
+import { useApiData } from "@/lib/dashboard-client";
 import Link from "next/link";
 import { toast } from "sonner";
-import { LoaderCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw } from "lucide-react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { resendVerification } from "@/store/auth/slice/authSlice";
@@ -145,6 +146,7 @@ export default function AccountPanel() {
           </button>
         </section>
       )}
+      <BillingSummary />
       <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 backdrop-blur">
         <h2 className="text-lg font-medium">Profile</h2>
         <form
@@ -349,5 +351,71 @@ export default function AccountPanel() {
         </button>
       </section>
     </div>
+  );
+}
+
+type BillingSummaryData = {
+  plan: "free" | "pro";
+  status: string;
+  entitled: boolean;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  usage: {
+    used: Record<"tokens" | "images" | "pages", number>;
+    limits: Record<"tokens" | "images" | "pages", number>;
+    remaining: Record<"tokens" | "images" | "pages", number>;
+  };
+};
+
+function BillingSummary() {
+  const billing = useApiData<BillingSummaryData>("/api/stripe/subscription", {
+    plan: "free",
+    status: "inactive",
+    entitled: false,
+    currentPeriodStart: null,
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+    usage: {
+      used: { tokens: 0, images: 0, pages: 0 },
+      limits: { tokens: 0, images: 0, pages: 0 },
+      remaining: { tokens: 0, images: 0, pages: 0 },
+    },
+  });
+
+  return (
+    <section className="rounded-2xl border border-violet-500/20 bg-violet-500/10 p-5 backdrop-blur">
+      <h2 className="text-lg font-medium">Plan and billing</h2>
+      {billing.loading ? (
+        <p className="mt-3 text-sm text-muted-foreground">Loading billing details…</p>
+      ) : billing.error ? (
+        <button className="mt-3 text-sm text-amber-200 underline" onClick={billing.retry}>
+          Billing details unavailable. Retry
+        </button>
+      ) : (
+        <div className="mt-3 space-y-3 text-sm">
+          <p>
+            <span className="text-muted-foreground">Current plan:</span>{" "}
+            <strong className="capitalize">{billing.data.entitled ? "pro" : "free"}</strong>{" "}
+            <span className="text-muted-foreground">· {billing.data.status.replaceAll("_", " ")}</span>
+          </p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {(["tokens", "images", "pages"] as const).map((unit) => (
+              <div key={unit} className="rounded-xl border border-white/10 bg-black/10 p-3">
+                <p className="capitalize text-muted-foreground">{unit}</p>
+                <p className="font-medium">
+                  {billing.data.usage.used[unit].toLocaleString()} used · {billing.data.usage.remaining[unit].toLocaleString()} remaining
+                </p>
+              </div>
+            ))}
+          </div>
+          {billing.data.currentPeriodEnd && (
+            <p className="text-muted-foreground">
+              {billing.data.cancelAtPeriodEnd ? "Access ends" : "Next renewal"}: {new Date(billing.data.currentPeriodEnd).toLocaleDateString()}
+            </p>
+          )}
+        </div>
+      )}
+    </section>
   );
 }

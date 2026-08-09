@@ -6,7 +6,12 @@ import {
   translationSchema,
 } from "@/lib/ai/contracts";
 import { cosineSimilarity } from "@/lib/ai/vector";
-import { ChatModel, DocumentChunkModel, SubscriptionModel } from "@/models";
+import {
+  ChatModel,
+  DocumentChunkModel,
+  StripeWebhookEventModel,
+  SubscriptionModel,
+} from "@/models";
 
 describe("AI feature contracts", () => {
   it("rejects oversized and unknown social input", () => {
@@ -75,6 +80,15 @@ describe("AI model ownership and indexes", () => {
     expect(SubscriptionModel.schema.indexes()).toEqual(
       expect.arrayContaining([
         [{ userId: 1 }, expect.objectContaining({ unique: true })],
+        [
+          { stripeSubscriptionId: 1 },
+          expect.objectContaining({ unique: true, sparse: true }),
+        ],
+      ]),
+    );
+    expect(StripeWebhookEventModel.schema.indexes()).toEqual(
+      expect.arrayContaining([
+        [{ id: 1 }, expect.objectContaining({ unique: true })],
       ]),
     );
   });

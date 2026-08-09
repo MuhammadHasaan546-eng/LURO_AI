@@ -1,7 +1,12 @@
+import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getStripe } from "@/lib/ai/providers";
 import { requireAiSession } from "@/lib/ai/http";
-import { getOrCreateCustomer, stripeErrorContext } from "@/lib/billing";
+import {
+  getConfiguredProPrice,
+  getOrCreateCustomer,
+  stripeErrorContext,
+} from "@/lib/billing";
 
 export const runtime = "nodejs";
 
@@ -18,14 +23,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const priceId = process.env.STRIPE_PRO_PRICE_ID;
-    if (!priceId) {
-      console.error("[Checkout API Error]: STRIPE_PRO_PRICE_ID missing in env");
-      return NextResponse.json(
-        { success: false, error: "PRICE_ID_MISSING" },
-        { status: 400 },
-      );
-    }
+    const price = await getConfiguredProPrice();
 
     const customer = await getOrCreateCustomer(
       session.userId,
@@ -43,12 +41,17 @@ export async function POST(request: Request) {
     const checkout = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customer.stripeCustomerId,
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: [{ price: price.id, quantity: 1 }],
       success_url: `${appUrl}/app/billing?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/app/billing`,
       client_reference_id: session.userId,
-      metadata: { userId: session.userId },
-      subscription_data: { metadata: { userId: session.userId } },
+      metadata: { userId: session.userId, plan: "pro" },
+      subscription_data: { metadata: { userId: session.userId, plan: "pro" } },
+      integration_identifier: `luro_pro_${randomBytes(6)
+        .toString("base64url")
+        .replace(/[^a-z]/gi, "")
+        .slice(0, 8)
+        .padEnd(8, "x")}`,
     });
 
     return NextResponse.json({
@@ -56,10 +59,13 @@ export async function POST(request: Request) {
       data: { url: checkout.url },
     });
   } catch (error: unknown) {
-    console.error("[Checkout Error Details]", {
-      message: errorMessage(error),
-      ...stripeErrorContext(error),
-    });
+    console.error(
+      JSON.stringify({
+        scope: "billing",
+        event: "checkout_failed",
+        ...stripeErrorContext(error),
+      }),
+    );
     return NextResponse.json(
       { success: false, error: errorMessage(error) },
       { status: 400 },

@@ -5,7 +5,7 @@ import { hasProEntitlementForPrice } from "@/app/constant/pricing";
 import { getStripe } from "@/lib/ai/providers";
 import { env } from "@/lib/env";
 import { connectToDatabase } from "@/lib/mongoose";
-import { SubscriptionModel } from "@/models";
+import { SubscriptionModel, UserModel } from "@/models";
 
 export type BillingPrice = {
   id: string;
@@ -130,6 +130,16 @@ export const getConfiguredProPrice = async (): Promise<BillingPrice> => {
 const stripeId = (value: string | { id: string } | null | undefined) =>
   typeof value === "string" ? value : value?.id;
 
+const stripeDate = (value: number | null | undefined) =>
+  typeof value === "number" ? new Date(value * 1000) : null;
+
+const requireMappedUser = async (userId: string | undefined, source: string) => {
+  if (!userId) throw new Error(`No application user mapping for ${source}.`);
+  const userExists = await UserModel.exists({ id: userId });
+  if (!userExists) throw new Error(`Application user ${userId} for ${source} was not found.`);
+  return userId;
+};
+
 export const getOrCreateCustomer = async (userId: string, email?: string) => {
   if (!userId) throw new Error("User ID is required to get or create customer.");
 
@@ -182,6 +192,7 @@ export const getOrCreateCustomer = async (userId: string, email?: string) => {
 
 export const syncStripeCheckoutSession = async (
   checkout: Stripe.Checkout.Session,
+  event?: Pick<Stripe.Event, "id" | "created">,
 ) => {
   const customerId = stripeId(checkout.customer);
   const subscriptionId = stripeId(checkout.subscription);
@@ -195,13 +206,12 @@ export const syncStripeCheckoutSession = async (
   }).lean();
   const existingUserId =
     existing && !Array.isArray(existing) ? existing.userId : undefined;
-  const userId =
+  const userId = await requireMappedUser(
     checkout.metadata?.userId ||
-    checkout.client_reference_id ||
-    existingUserId;
-  if (!userId) {
-    throw new Error(`No application user mapping for checkout ${checkout.id}.`);
-  }
+      checkout.client_reference_id ||
+      existingUserId,
+    `checkout ${checkout.id}`,
+  );
 
   await SubscriptionModel.findOneAndUpdate(
     { userId },
@@ -211,7 +221,13 @@ export const syncStripeCheckoutSession = async (
         stripeCheckoutSessionId: checkout.id,
         stripeCheckoutSessionStatus: checkout.status,
         stripeCheckoutUrl: checkout.url ?? null,
-        stripeSubscriptionId: subscriptionId ?? null,
+        ...(subscriptionId ? { stripeSubscriptionId: subscriptionId } : {}),
+        ...(event
+          ? {
+              lastStripeEventId: event.id,
+              lastStripeEventCreated: event.created,
+            }
+          : {}),
       },
       $setOnInsert: {
         userId,
@@ -231,6 +247,7 @@ export const syncStripeCheckoutSession = async (
 
 export const syncStripeSubscription = async (
   subscription: Stripe.Subscription,
+  event?: Pick<Stripe.Event, "id" | "created">,
 ) => {
   const customerId = stripeId(subscription.customer);
   if (!customerId) {
@@ -243,10 +260,10 @@ export const syncStripeSubscription = async (
   }).lean();
   const existingUserId =
     existing && !Array.isArray(existing) ? existing.userId : undefined;
-  const userId = subscription.metadata?.userId || existingUserId;
-  if (!userId) {
-    throw new Error(`No application user mapping for subscription ${subscription.id}.`);
-  }
+  const userId = await requireMappedUser(
+    subscription.metadata?.userId || existingUserId,
+    `subscription ${subscription.id}`,
+  );
 
   const item = subscription.items.data[0];
   const priceId = item ? stripeId(item.price) : undefined;
@@ -256,8 +273,16 @@ export const syncStripeSubscription = async (
     stripePriceId: priceId,
   });
 
-  await SubscriptionModel.findOneAndUpdate(
-    { userId },
+  const eventFilter = event
+    ? {
+        $or: [
+          { lastStripeEventCreated: { $lte: event.created } },
+          { lastStripeEventCreated: { $exists: false } },
+        ],
+      }
+    : {};
+  const updated = await SubscriptionModel.findOneAndUpdate(
+    { userId, ...eventFilter },
     {
       $set: {
         stripeCustomerId: customerId,
@@ -266,15 +291,32 @@ export const syncStripeSubscription = async (
         plan: entitled ? "pro" : "free",
         entitled,
         status: subscription.status,
-        currentPeriodEnd: item?.current_period_end
-          ? new Date(item.current_period_end * 1000)
-          : null,
+        currentPeriodStart: stripeDate(item?.current_period_start),
+        currentPeriodEnd: stripeDate(item?.current_period_end),
+        cancelAt: stripeDate(subscription.cancel_at),
+        canceledAt: stripeDate(subscription.canceled_at),
+        endedAt: stripeDate(subscription.ended_at),
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        ...(event
+          ? {
+              lastStripeEventId: event.id,
+              lastStripeEventCreated: event.created,
+            }
+          : {}),
       },
       $setOnInsert: { userId },
     },
-    { upsert: true, new: true, runValidators: true },
+    { upsert: !event, new: true, runValidators: true },
   );
+  if (!updated && event) {
+    billingLog("info", "stale_subscription_event_ignored", {
+      userId,
+      stripeSubscriptionId: subscription.id,
+      eventId: event.id,
+      eventCreated: event.created,
+    });
+    return;
+  }
   billingLog("info", "subscription_synced", {
     userId,
     stripeSubscriptionId: subscription.id,
@@ -282,4 +324,46 @@ export const syncStripeSubscription = async (
     plan: entitled ? "pro" : "free",
     entitled,
   });
+};
+
+export const syncStripeInvoice = async (
+  invoice: Stripe.Invoice,
+  paymentStatus: "paid" | "failed",
+) => {
+  const customerId = stripeId(invoice.customer);
+  if (!customerId) throw new Error(`Invoice ${invoice.id} has no customer.`);
+
+  await connectToDatabase();
+  const updated = await SubscriptionModel.findOneAndUpdate(
+    { stripeCustomerId: customerId },
+    {
+      $set: {
+        latestInvoiceId: invoice.id,
+        latestPaymentStatus: paymentStatus,
+      },
+    },
+    { new: true, runValidators: true },
+  );
+  if (!updated) throw new Error(`No billing profile for invoice ${invoice.id}.`);
+};
+
+export const syncStripeRefund = async (charge: Stripe.Charge) => {
+  const customerId = stripeId(charge.customer);
+  if (!customerId) {
+    billingLog("info", "refund_without_customer", { chargeId: charge.id });
+    return;
+  }
+
+  await connectToDatabase();
+  await SubscriptionModel.findOneAndUpdate(
+    { stripeCustomerId: customerId },
+    {
+      $set: {
+        latestPaymentStatus: charge.refunded
+          ? "refunded"
+          : "partially_refunded",
+      },
+    },
+    { runValidators: true },
+  );
 };

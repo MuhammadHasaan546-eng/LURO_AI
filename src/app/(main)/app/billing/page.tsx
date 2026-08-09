@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
   Check,
@@ -28,6 +28,7 @@ import {
   type PlanId,
 } from "@/app/constant/pricing";
 
+type UsageUnit = "tokens" | "images" | "pages";
 type Subscription = {
   plan: PlanId;
   status:
@@ -40,8 +41,22 @@ type Subscription = {
     | "canceled"
     | "unpaid"
     | "paused";
+  entitled: boolean;
+  stripeSubscriptionId?: string | null;
+  currentPeriodStart?: string | null;
   currentPeriodEnd?: string | null;
   cancelAtPeriodEnd?: boolean;
+  latestPaymentStatus:
+    | "none"
+    | "paid"
+    | "failed"
+    | "refunded"
+    | "partially_refunded";
+  usage: {
+    used: Record<UsageUnit, number>;
+    limits: Record<UsageUnit, number>;
+    remaining: Record<UsageUnit, number>;
+  };
 };
 
 const statusText: Record<Subscription["status"], string> = {
@@ -64,30 +79,55 @@ export default function BillingPage() {
   const subscription = useApiData<Subscription>("/api/stripe/subscription", {
     plan: "free",
     status: "inactive",
+    entitled: false,
+    currentPeriodStart: null,
     currentPeriodEnd: null,
     cancelAtPeriodEnd: false,
+    latestPaymentStatus: "none",
+    usage: {
+      used: { tokens: 0, images: 0, pages: 0 },
+      limits: { tokens: 0, images: 0, pages: 0 },
+      remaining: { tokens: 0, images: 0, pages: 0 },
+    },
   });
   
   const [catalog, setCatalog] = useState<BillingCatalog | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const retrySubscription = subscription.retry;
+  const pollingStartedForSession = useRef<string | null>(null);
 
-  // 1. Stripe redirect handling with auto-retry
   useEffect(() => {
-    if (sessionId) {
-      toast.success("Payment successful! Updating your subscription...");
-      // Re-fetch latest subscription status from DB
-      subscription.retry();
+    if (!sessionId || pollingStartedForSession.current === sessionId) return;
+    pollingStartedForSession.current = sessionId;
+    toast.info("Payment received. Waiting for secure subscription confirmation…");
+    let attempts = 0;
+    let stopped = false;
 
-      const timer = setTimeout(() => {
-        subscription.retry();
-        // Clear session_id from URL without refreshing the page
+    const poll = async () => {
+      attempts += 1;
+      await retrySubscription();
+      if (!stopped && attempts < 10)
+        window.setTimeout(() => void poll(), 1500);
+      else if (!stopped) {
         router.replace("/app/billing");
-      }, 1500);
+        toast.info(
+          "Stripe confirmation is still processing. Refresh billing shortly if Pro is not yet visible.",
+        );
+      }
+    };
 
-      return () => clearTimeout(timer);
-    }
-  }, [sessionId]);
+    void poll();
+    return () => {
+      stopped = true;
+    };
+  }, [sessionId, retrySubscription, router]);
+
+  useEffect(() => {
+    if (!sessionId || !subscription.data.entitled) return;
+    router.replace("/app/billing");
+    toast.success("Pro is active and your allowances are ready.");
+  }, [sessionId, subscription.data.entitled, router]);
 
   useEffect(() => {
     void apiRequest<BillingCatalog>("/api/stripe/catalog")
@@ -112,8 +152,8 @@ export default function BillingPage() {
     }
   };
 
-  const currentPlan = subscription.data.plan;
-  const canManage = currentPlan === "pro";
+  const currentPlan = subscription.data.entitled ? "pro" : "free";
+  const canManage = Boolean(subscription.data.stripeSubscriptionId) || currentPlan === "pro";
   const isScheduledToCancel = Boolean(
     canManage && subscription.data.cancelAtPeriodEnd,
   );
@@ -166,6 +206,37 @@ export default function BillingPage() {
               )}
             </CardContent>
           </Card>
+
+          {sessionId && !subscription.data.entitled && (
+            <Card className="border-amber-400/25 bg-amber-400/10">
+              <CardContent className="flex items-center gap-3 p-4 text-sm text-amber-100">
+                <LoaderCircle className="size-4 animate-spin" />
+                Stripe is securely synchronizing your payment. Pro access is enabled only after the verified webhook arrives.
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            {(["tokens", "images", "pages"] as UsageUnit[]).map((unit) => (
+              <Card key={unit} className="border-white/10 bg-white/[0.02]">
+                <CardContent className="p-4">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{unit}</p>
+                  <p className="mt-1 text-lg font-semibold">
+                    {subscription.data.usage.used[unit].toLocaleString()} / {subscription.data.usage.limits[unit].toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {subscription.data.usage.remaining[unit].toLocaleString()} remaining this billing period
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {subscription.data.latestPaymentStatus === "failed" && (
+            <p role="alert" className="text-sm text-red-300">
+              The latest payment failed. Update your payment method in the billing portal.
+            </p>
+          )}
 
           {catalogError && (
             <p role="alert" className="text-sm text-amber-300">

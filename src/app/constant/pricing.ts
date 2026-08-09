@@ -27,18 +27,27 @@ export type Plan = {
 
 export const PRO_SUBSCRIPTION_STATUSES = ["active", "trialing"] as const;
 
-export const hasProEntitlementForPrice = (input: {
+export const getEffectivePlan = (input: {
   plan?: string | null;
   status?: string | null;
   stripePriceId?: string | null;
   configuredPriceId?: string | null;
-}) =>
+}): PlanId =>
   Boolean(input.configuredPriceId) &&
   input.plan === "pro" &&
   PRO_SUBSCRIPTION_STATUSES.includes(
     input.status as (typeof PRO_SUBSCRIPTION_STATUSES)[number],
   ) &&
-  input.stripePriceId === input.configuredPriceId;
+  input.stripePriceId === input.configuredPriceId
+    ? "pro"
+    : "free";
+
+export const hasProEntitlementForPrice = (input: {
+  plan?: string | null;
+  status?: string | null;
+  stripePriceId?: string | null;
+  configuredPriceId?: string | null;
+}) => getEffectivePlan(input) === "pro";
 
 export const PLANS: Plan[] = [
   {

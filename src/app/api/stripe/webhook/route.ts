@@ -6,13 +6,20 @@ import {
   billingLog,
   stripeErrorContext,
   syncStripeCheckoutSession,
+  syncStripeInvoice,
+  syncStripeRefund,
   syncStripeSubscription,
 } from "@/lib/billing";
+import { connectToDatabase } from "@/lib/mongoose";
+import { StripeWebhookEventModel } from "@/models";
 
 export const runtime = "nodejs";
 
 const messageFromError = (error: unknown) =>
   error instanceof Error ? error.message : "Unknown webhook error";
+
+const stripeId = (value: string | { id: string } | null | undefined) =>
+  typeof value === "string" ? value : value?.id;
 
 const invoiceSubscriptionId = (invoice: Stripe.Invoice) => {
   const invoiceWithSubscription = invoice as Stripe.Invoice & {
@@ -63,31 +70,96 @@ export async function POST(request: Request) {
   });
 
   try {
+    await connectToDatabase();
+    const claimed = await StripeWebhookEventModel.findOneAndUpdate(
+      { id: event.id },
+      {
+        $setOnInsert: {
+          id: event.id,
+          type: event.type,
+          status: "processing",
+        },
+      },
+      { upsert: true, new: true, rawResult: true, runValidators: true },
+    );
+    const wasInserted = Boolean(claimed.lastErrorObject?.upserted);
+    if (!wasInserted) {
+      billingLog("info", "webhook_duplicate_ignored", {
+        requestId,
+        eventId: event.id,
+        eventType: event.type,
+      });
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+
     switch (event.type) {
       case "checkout.session.completed":
-        await syncStripeCheckoutSession(event.data.object);
+      case "checkout.session.async_payment_succeeded": {
+        await syncStripeCheckoutSession(event.data.object, event);
+        const subscriptionId = stripeId(event.data.object.subscription);
+        if (subscriptionId) {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          await syncStripeSubscription(subscription, event);
+        }
+        break;
+      }
+
+      case "checkout.session.expired":
+        await syncStripeCheckoutSession(event.data.object, event);
         break;
 
       case "customer.subscription.created":
       case "customer.subscription.updated":
       case "customer.subscription.deleted":
-        await syncStripeSubscription(event.data.object);
+        await syncStripeSubscription(event.data.object, event);
         break;
 
-      case "invoice.paid": {
+      case "invoice.paid":
+      case "invoice.payment_succeeded": {
+        await syncStripeInvoice(event.data.object, "paid");
         const subscriptionId = invoiceSubscriptionId(event.data.object);
-        if (!subscriptionId) {
-          billingLog("info", "invoice_without_subscription", {
+        if (subscriptionId) {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          await syncStripeSubscription(subscription, event);
+        }
+        break;
+      }
+
+      case "invoice_payment.paid": {
+        const invoicePayment = event.data.object;
+        const invoiceId = stripeId(invoicePayment.invoice);
+        if (!invoiceId) {
+          billingLog("info", "invoice_payment_without_invoice", {
             requestId,
             eventId: event.id,
-            invoiceId: event.data.object.id,
+            invoicePaymentId: invoicePayment.id,
           });
           break;
         }
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-        await syncStripeSubscription(subscription);
+        const invoice = await stripe.invoices.retrieve(invoiceId);
+        await syncStripeInvoice(invoice, "paid");
+        const subscriptionId = invoiceSubscriptionId(invoice);
+        if (subscriptionId) {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          await syncStripeSubscription(subscription, event);
+        }
         break;
       }
+
+      case "invoice.payment_failed":
+      case "invoice.payment_action_required": {
+        await syncStripeInvoice(event.data.object, "failed");
+        const subscriptionId = invoiceSubscriptionId(event.data.object);
+        if (subscriptionId) {
+          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          await syncStripeSubscription(subscription, event);
+        }
+        break;
+      }
+
+      case "charge.refunded":
+        await syncStripeRefund(event.data.object);
+        break;
 
       default:
         billingLog("info", "webhook_ignored", {
@@ -97,8 +169,20 @@ export async function POST(request: Request) {
         });
     }
 
+    await StripeWebhookEventModel.updateOne(
+      { id: event.id },
+      { $set: { status: "processed", processedAt: new Date() } },
+    );
+
     return NextResponse.json({ received: true });
   } catch (error: unknown) {
+    await StripeWebhookEventModel.deleteOne({ id: event.id }).catch(
+      (recordError: unknown) =>
+        billingLog("error", "webhook_failure_record_failed", {
+          eventId: event.id,
+          ...stripeErrorContext(recordError),
+        }),
+    );
     billingLog("error", "webhook_processing_failed", {
       requestId,
       eventId: event.id,

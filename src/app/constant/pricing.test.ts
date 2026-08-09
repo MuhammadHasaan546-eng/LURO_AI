@@ -3,6 +3,7 @@ import {
   formatInterval,
   formatPrice,
   getPlanFeatures,
+  getEffectivePlan,
   hasProEntitlementForPrice,
 } from "@/app/constant/pricing";
 
@@ -61,5 +62,24 @@ describe("billing pricing contract", () => {
         configuredPriceId: null,
       }),
     ).toBe(false);
+  });
+
+  it("returns free for every non-eligible subscription state", () => {
+    expect(
+      getEffectivePlan({
+        plan: "pro",
+        status: "past_due",
+        stripePriceId: "price_pro",
+        configuredPriceId: "price_pro",
+      }),
+    ).toBe("free");
+    expect(
+      getEffectivePlan({
+        plan: "pro",
+        status: "trialing",
+        stripePriceId: "price_pro",
+        configuredPriceId: "price_pro",
+      }),
+    ).toBe("pro");
   });
 });
