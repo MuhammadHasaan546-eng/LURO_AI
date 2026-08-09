@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import Image from "next/image";
 import {
   Download,
@@ -34,6 +34,34 @@ type AiImage = {
   width: number;
   height: number;
   createdAt: string;
+};
+
+type CloudinaryImageProps = Omit<ComponentProps<typeof Image>, "src"> & {
+  src: string;
+};
+
+const CloudinaryImage = ({ src, onError, ...props }: CloudinaryImageProps) => {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <div className="flex size-full items-center justify-center bg-white/[0.03] p-4 text-center text-xs text-muted-foreground">
+        Image unavailable. Open the original URL to retry.
+      </div>
+    );
+  }
+
+  return (
+    <Image
+      {...props}
+      src={src}
+      unoptimized
+      onError={(event) => {
+        setFailed(true);
+        onError?.(event);
+      }}
+    />
+  );
 };
 
 const CATEGORIES = [
@@ -187,7 +215,7 @@ export default function ImagePage() {
   const output = result ? (
     <Card className="overflow-hidden border-white/10 bg-white/[0.02] shadow-2xl backdrop-blur">
       <div className="relative aspect-square w-full overflow-hidden bg-black/40 flex items-center justify-center">
-        <Image
+        <CloudinaryImage
           src={result.secureUrl}
           alt={result.prompt}
           fill
@@ -259,7 +287,7 @@ export default function ImagePage() {
                   : "border-white/10 hover:border-white/30"
               }`}
             >
-              <Image
+              <CloudinaryImage
                 src={image.secureUrl}
                 alt={image.prompt}
                 fill

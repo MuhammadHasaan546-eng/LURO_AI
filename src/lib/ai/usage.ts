@@ -1,9 +1,10 @@
 import "server-only";
 
 import mongoose from "mongoose";
+import { randomUUID } from "node:crypto";
 import { env } from "@/lib/env";
 import { hasProEntitlement } from "@/lib/billing";
-import { connectToDatabase, withMongoTransaction } from "@/lib/mongoose";
+import { connectToDatabase } from "@/lib/mongoose";
 import {
   RateLimitBucketModel,
   SubscriptionModel,
@@ -102,6 +103,35 @@ export const usageSummary = async (userId: string) => {
   };
 };
 
+const isMongoError = (error: unknown) =>
+  error instanceof mongoose.Error ||
+  (typeof error === "object" && error !== null && "code" in error);
+
+const isDuplicateKeyError = (error: unknown): error is { code: 11000 } =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  error.code === 11000;
+
+const toFiniteNumber = (value: unknown, name: string) => {
+  const number = Number(value);
+  if (!Number.isFinite(number))
+    throw new HttpError(
+      500,
+      "INVALID_USAGE_CONFIGURATION",
+      `Invalid numeric usage value: ${name}.`,
+    );
+  return number;
+};
+
+const fallbackReservation = (input: { userId: string; quantity: number; unit: UsageUnit }) => ({
+  id: `usage-fallback:${randomUUID()}`,
+  period: currentPeriod(),
+  userId: input.userId,
+  quantity: input.quantity,
+  unit: input.unit,
+});
+
 export const reserveUsage = async (input: {
   userId: string;
   unit: UsageUnit;
@@ -110,84 +140,141 @@ export const reserveUsage = async (input: {
   model: string;
   resourceId?: string;
 }) => {
-  if (!Number.isInteger(input.quantity) || input.quantity <= 0)
+  const estimatedCost = Number(input.quantity);
+  if (!Number.isFinite(estimatedCost) || !Number.isInteger(estimatedCost) || estimatedCost <= 0)
     throw new HttpError(400, "INVALID_USAGE_RESERVATION", "Invalid usage reservation.");
 
-  const access = await getBillingAccess(input.userId);
-  const period = currentPeriod(access.periodStart);
-  const counterId = `${input.userId}:${period}:${input.unit}`;
-  const limit = limits[access.plan][input.unit];
+  try {
+    const access = await getBillingAccess(input.userId);
+    const period = currentPeriod(access.periodStart);
+    const counterId = `${input.userId}:${period}:${input.unit}`;
+    const limit = Number(toFiniteNumber(limits[access.plan][input.unit], "limit"));
+    const maxAllowed = Number(limit - estimatedCost);
 
-  return withMongoTransaction(async (session) => {
-    await UsageCounterModel.updateOne(
-      { id: counterId },
-      { $setOnInsert: { id: counterId, userId: input.userId, period, unit: input.unit, used: 0 } },
-      { upsert: true, session },
-    );
-    const counter = await UsageCounterModel.findOneAndUpdate(
-      { id: counterId, $expr: { $lte: [{ $add: ["$used", input.quantity] }, limit] } },
-      { $inc: { used: input.quantity } },
-      { new: true, session, runValidators: true },
-    ).lean();
+    // Never send an object, NaN, or Infinity as the comparison operand.
+    if (typeof maxAllowed !== "number" || !Number.isFinite(maxAllowed))
+      throw new HttpError(
+        500,
+        "INVALID_USAGE_CONFIGURATION",
+        "Unable to calculate the usage allowance.",
+      );
+    if (maxAllowed < 0)
+      throw new HttpError(402, "USAGE_LIMIT_EXCEEDED", `Monthly ${input.unit} allowance exceeded.`);
+
+    const identity = { userId: input.userId, unit: input.unit, period };
+    // sanitizeFilter is enabled globally. Mark this server-built operator as
+    // trusted so Mongoose preserves `$lte` instead of wrapping it in `$eq`,
+    // which would attempt to cast the whole operator object to Number.
+    const filter = {
+      ...identity,
+      used: mongoose.trusted({ $lte: Number(maxAllowed) }),
+    };
+    const update = {
+      $inc: { used: estimatedCost },
+      $setOnInsert: { id: counterId, ...identity },
+    };
+
+    // Quota check and increment are atomic. Concurrent first-time upserts can
+    // race on either unique index; retry the loser without upsert.
+    let counter;
+    try {
+      counter = await UsageCounterModel.findOneAndUpdate(filter, update, {
+        upsert: true,
+        new: true,
+        runValidators: true,
+      }).lean();
+    } catch (error) {
+      if (!isDuplicateKeyError(error)) throw error;
+      counter = await UsageCounterModel.findOneAndUpdate(
+        filter,
+        { $inc: { used: estimatedCost } },
+        { new: true, runValidators: true },
+      ).lean();
+    }
     if (!counter)
       throw new HttpError(402, "USAGE_LIMIT_EXCEEDED", `Monthly ${input.unit} allowance exceeded.`);
-    const [reservation] = await UsageModel.create([{
+
+    const reservation = await UsageModel.create({
       userId: input.userId,
       feature: input.feature,
-      quantity: input.quantity,
-      reservedQuantity: input.quantity,
+      quantity: estimatedCost,
+      reservedQuantity: estimatedCost,
       status: "reserved",
       unit: input.unit,
       model: input.model,
       resourceId: input.resourceId ?? null,
       period,
-    }], { session });
+    });
     return { id: reservation.id, period };
-  });
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    if (isMongoError(error)) {
+      console.error("[Usage reservation fallback] MongoDB usage reservation failed:", error);
+      // Usage accounting must not take down an otherwise healthy AI request.
+      return fallbackReservation(input);
+    }
+    throw error;
+  }
 };
 
-export const releaseUsage = async (reservationId: string) =>
-  withMongoTransaction(async (session) => {
+export const releaseUsage = async (reservationId: string) => {
+  if (reservationId.startsWith("usage-fallback:")) return;
+  try {
     const reservation = (await UsageModel.findOneAndUpdate(
       { id: reservationId, status: "reserved" },
       { $set: { status: "released", quantity: 0 } },
-      { new: false, session },
+      { new: false },
     ).lean()) as { userId: string; period: string; unit: UsageUnit; reservedQuantity: number } | null;
     if (!reservation) return;
     await UsageCounterModel.updateOne(
-      { id: `${reservation.userId}:${reservation.period}:${reservation.unit}` },
+      {
+        userId: reservation.userId,
+        unit: reservation.unit,
+        period: reservation.period,
+      },
       { $inc: { used: -reservation.reservedQuantity } },
-      { session },
+      { runValidators: true },
     );
-  });
+  } catch (error) {
+    console.error("[Usage release fallback] Usage reconciliation failed:", error);
+  }
+};
 
 export const commitUsage = async (reservationId: string, actualQuantity: number) => {
   if (!Number.isInteger(actualQuantity) || actualQuantity < 0)
     throw new HttpError(500, "INVALID_USAGE_COMMIT", "Invalid usage commit.");
-  return withMongoTransaction(async (session) => {
-    const reservation = (await UsageModel.findOne({ id: reservationId, status: "reserved" }).session(session).lean()) as {
+  if (reservationId.startsWith("usage-fallback:")) return;
+try {
+    const actual = Math.max(0, Number(actualQuantity) || 0);
+
+    // Step 1: Find and update the reservation safely using primitive ID lookup
+    let reservation = (await UsageModel.findOneAndUpdate(
+      { id: reservationId, status: "reserved" },
+      { $set: { status: "committed", quantity: actual } },
+      { new: false }
+    ).lean()) as {
       userId: string; period: string; unit: UsageUnit; reservedQuantity: number;
     } | null;
+
     if (!reservation) return;
-    if (actualQuantity > reservation.reservedQuantity)
-      throw new HttpError(409, "USAGE_RESERVATION_TOO_SMALL", "Actual usage exceeded the reservation estimate.");
-    const delta = actualQuantity - reservation.reservedQuantity;
+
+    // Step 2: Reconcile the difference in UsageCounter atomically
+    const reserved = Number(reservation.reservedQuantity) || 0;
+    const delta = actual - reserved;
+
     if (delta !== 0) {
-      // The provider has already consumed this usage, so reconciliation must
-      // always record the exact amount. A conservative reservation estimate
-      // bounds any possible overage while negative deltas refund unused units.
       await UsageCounterModel.updateOne(
-        { id: `${reservation.userId}:${reservation.period}:${reservation.unit}` },
-        { $inc: { used: delta } },
-        { session, runValidators: true },
+        {
+          userId: reservation.userId,
+          unit: reservation.unit,
+          period: reservation.period,
+        },
+        { $inc: { used: delta } }
       );
     }
-    await UsageModel.updateOne(
-      { id: reservationId, status: "reserved" },
-      { $set: { status: "committed", quantity: actualQuantity } },
-      { session },
-    );
-  });
+  } catch (error) {
+    console.error("[Usage commit fallback] Usage reconciliation failed:", error);
+  }
 };
 
 export const enforceAiRateLimit = async (userId: string, action: string) => {

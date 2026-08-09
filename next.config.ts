@@ -37,9 +37,24 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   images: {
     remotePatterns: [
-      { protocol: "https", hostname: "res.cloudinary.com" },
-      { protocol: "https", hostname: "image.pollinations.ai" },
-      { protocol: "https", hostname: "avatar.vercel.sh" },
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+        port: "",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "image.pollinations.ai",
+        port: "",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "avatar.vercel.sh",
+        port: "",
+        pathname: "/**",
+      },
     ],
   },
   async headers() {

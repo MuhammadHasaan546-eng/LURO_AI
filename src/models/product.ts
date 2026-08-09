@@ -237,7 +237,10 @@ const usageCounterSchema = new Schema(
   schemaOptions,
 );
 usageCounterSchema.index({ id: 1 }, { unique: true });
-usageCounterSchema.index({ userId: 1, period: 1, unit: 1 }, { unique: true });
+usageCounterSchema.index(
+  { userId: 1, unit: 1, period: 1 },
+  { unique: true, name: "usage_counter_identity" },
+);
 
 const subscriptionSchema = new Schema(
   {
