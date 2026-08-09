@@ -77,7 +77,7 @@ const DashboardNavbar = () => {
             variant="ghost"
             className="hidden lg:flex"
           >
-            <Link href="/help" target="_blank">
+            <Link href="/app/help" target="_blank" aria-label="Open help center">
               <HelpCircleIcon className="size-5" />
             </Link>
           </Button>

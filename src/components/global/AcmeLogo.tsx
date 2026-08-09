@@ -1,6 +1,8 @@
-import React from "react";
+import type { SVGProps } from "react";
 
-export const AcmeLogo = (props: any) => (
+type LogoProps = SVGProps<SVGSVGElement>;
+
+export const AcmeLogo = (props: LogoProps) => (
   <svg
     viewBox="0 0 120 30"
     fill="currentColor"
@@ -11,7 +13,7 @@ export const AcmeLogo = (props: any) => (
   </svg>
 );
 
-export const PulseAILogo = (props: any) => (
+export const PulseAILogo = (props: LogoProps) => (
   <svg
     viewBox="0 0 130 30"
     fill="currentColor"
@@ -39,7 +41,7 @@ export const PulseAILogo = (props: any) => (
   </svg>
 );
 
-export const NexusLogo = (props: any) => (
+export const NexusLogo = (props: LogoProps) => (
   <svg
     viewBox="0 0 120 30"
     fill="currentColor"
@@ -73,7 +75,7 @@ export const NexusLogo = (props: any) => (
   </svg>
 );
 
-export const VertexLogo = (props: any) => (
+export const VertexLogo = (props: LogoProps) => (
   <svg
     viewBox="0 0 120 30"
     fill="currentColor"
@@ -94,7 +96,7 @@ export const VertexLogo = (props: any) => (
   </svg>
 );
 
-export const HyperGrowthLogo = (props: any) => (
+export const HyperGrowthLogo = (props: LogoProps) => (
   <svg
     viewBox="0 0 150 30"
     fill="currentColor"
@@ -130,7 +132,7 @@ export const HyperGrowthLogo = (props: any) => (
   </svg>
 );
 
-export const OmniMediaLogo = (props: any) => (
+export const OmniMediaLogo = (props: LogoProps) => (
   <svg
     viewBox="0 0 130 30"
     fill="currentColor"

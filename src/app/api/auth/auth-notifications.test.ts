@@ -28,6 +28,12 @@ vi.mock("@/lib/auth", () => auth);
 vi.mock("@/lib/db", () => ({ db }));
 vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
+  checkSignupRateLimits: vi.fn().mockResolvedValue({
+    allowed: true,
+    limit: 5,
+    remaining: 4,
+    retryAfter: 0,
+  }),
 }));
 vi.mock("@/lib/env", () => ({
   env: {

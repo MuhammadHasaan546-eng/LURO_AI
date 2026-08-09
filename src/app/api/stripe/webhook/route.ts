@@ -15,8 +15,10 @@ import { StripeWebhookEventModel } from "@/models";
 
 export const runtime = "nodejs";
 
-const messageFromError = (error: unknown) =>
-  error instanceof Error ? error.message : "Unknown webhook error";
+const safeWebhookError = (error: unknown) =>
+  error instanceof Stripe.errors.StripeError
+    ? "Stripe request failed while processing the webhook."
+    : "Webhook processing failed.";
 
 const stripeId = (value: string | { id: string } | null | undefined) =>
   typeof value === "string" ? value : value?.id;
@@ -59,7 +61,7 @@ export async function POST(request: Request) {
       requestId,
       ...stripeErrorContext(error),
     });
-    return new NextResponse(`Webhook Error: ${messageFromError(error)}`, {
+    return new NextResponse("Webhook signature verification failed.", {
       status: 400,
     });
   }
@@ -83,16 +85,35 @@ export async function POST(request: Request) {
           { status: "processing", processingLeaseUntil: { $lte: now } },
         ],
       },
-      { $set: { status: "processing", processingLeaseUntil: leaseUntil, processingToken, error: null } },
+      {
+        $set: {
+          status: "processing",
+          processingLeaseUntil: leaseUntil,
+          processingToken,
+          error: null,
+        },
+      },
       { new: true, runValidators: true },
     );
-    const inserted = claimed ?? (await StripeWebhookEventModel.create({
-      id: event.id,
-      type: event.type,
-      status: "processing",
-      processingLeaseUntil: leaseUntil,
-      processingToken,
-    }));
+    let inserted = claimed;
+    if (!inserted) {
+      try {
+        inserted = await StripeWebhookEventModel.create({
+          id: event.id,
+          type: event.type,
+          status: "processing",
+          processingLeaseUntil: leaseUntil,
+          processingToken,
+        });
+      } catch (error: unknown) {
+        // Another delivery may have inserted the event between the claim and
+        // create calls. Re-read it instead of turning a harmless duplicate into
+        // a retry storm.
+        if ((error as { code?: unknown })?.code !== 11000) throw error;
+        inserted = await StripeWebhookEventModel.findOne({ id: event.id });
+      }
+    }
+    if (!inserted) throw new Error("Webhook event claim could not be established.");
     const wasClaimed = inserted.processingToken === processingToken;
     if (!wasClaimed) {
       billingLog("info", "webhook_duplicate_ignored", {
@@ -180,10 +201,25 @@ export async function POST(request: Request) {
         });
     }
 
-    await StripeWebhookEventModel.updateOne(
+    const completed = await StripeWebhookEventModel.updateOne(
       { id: event.id, status: "processing", processingToken },
-      { $set: { status: "processed", processedAt: new Date(), processingLeaseUntil: null, processingToken: null } },
+      {
+        $set: {
+          status: "processed",
+          processedAt: new Date(),
+          processingLeaseUntil: null,
+          processingToken: null,
+        },
+      },
     );
+    if (completed.matchedCount !== 1) {
+      // The five-minute lease was reclaimed while this handler was running.
+      // Do not acknowledge the event because the current owner must finish it.
+      return NextResponse.json(
+        { received: false, error: "WEBHOOK_LEASE_LOST" },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({ received: true });
   } catch (error: unknown) {
@@ -192,7 +228,7 @@ export async function POST(request: Request) {
       {
         $set: {
           status: "failed",
-          error: messageFromError(error).slice(0, 1_000),
+          error: safeWebhookError(error),
           processingLeaseUntil: null,
           processingToken: null,
         },

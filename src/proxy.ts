@@ -9,6 +9,30 @@ const DEVELOPMENT_AUTH_SECRET =
 
 const protectedApi = ["/api/account", "/api/auth/resend-verification"];
 
+const proxySecurityHeaders = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+} as const;
+
+const applySecurityHeaders = <T extends NextResponse>(response: T): T => {
+  for (const [key, value] of Object.entries(proxySecurityHeaders)) {
+    response.headers.set(key, value);
+  }
+
+  // HSTS must only be sent over production HTTPS. Enabling it on localhost can
+  // make local development inaccessible in browsers that cache the policy.
+  if (process.env.NODE_ENV === "production") {
+    response.headers.set(
+      "Strict-Transport-Security",
+      "max-age=63072000; includeSubDomains; preload",
+    );
+  }
+
+  return response;
+};
+
 const isProtectedApiPath = (pathname: string) =>
   protectedApi.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
@@ -16,14 +40,7 @@ const isProtectedApiPath = (pathname: string) =>
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const response = NextResponse.next();
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  if (process.env.NODE_ENV === "production")
-    response.headers.set(
-      "Strict-Transport-Security",
-      "max-age=63072000; includeSubDomains; preload",
-    );
+  const response = applySecurityHeaders(NextResponse.next());
   if (!isProtectedApiPath(pathname)) return response;
 
   // Keep token verification consistent with lib/auth.ts in development. In
@@ -35,13 +52,15 @@ export async function proxy(request: NextRequest) {
       : DEVELOPMENT_AUTH_SECRET);
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   if (!secret || !token || token.length > 4096) {
-    return NextResponse.json(
-      {
-        success: false,
-        code: "UNAUTHORIZED",
-        message: "Authentication required.",
-      },
-      { status: 401 },
+    return applySecurityHeaders(
+      NextResponse.json(
+        {
+          success: false,
+          code: "UNAUTHORIZED",
+          message: "Authentication required.",
+        },
+        { status: 401 },
+      ),
     );
   }
 
@@ -53,13 +72,15 @@ export async function proxy(request: NextRequest) {
     });
     return response;
   } catch {
-    return NextResponse.json(
-      {
-        success: false,
-        code: "INVALID_TOKEN",
-        message: "Your session has expired. Please sign in again.",
-      },
-      { status: 401 },
+    return applySecurityHeaders(
+      NextResponse.json(
+        {
+          success: false,
+          code: "INVALID_TOKEN",
+          message: "Your session has expired. Please sign in again.",
+        },
+        { status: 401 },
+      ),
     );
   }
 }

@@ -58,9 +58,11 @@ type StripeErrorLike = {
 const isStripeErrorLike = (value: unknown): value is StripeErrorLike =>
   typeof value === "object" && value !== null;
 
-const errorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : String(error);
-
+/**
+ * Produces a deliberately message-free logging context. Provider and database
+ * errors can embed request bodies, credentials, collection names, or query
+ * details in their messages, so billing logs retain only bounded metadata.
+ */
 export const stripeErrorContext = (error: unknown) => {
   if (!error) return { errorType: "UnknownError" };
 
@@ -68,7 +70,6 @@ export const stripeErrorContext = (error: unknown) => {
     return {
       errorType:
         typeof error.type === "string" ? error.type : "StripeError",
-      errorMessage: errorMessage(error),
       stripeCode: typeof error.code === "string" ? error.code : undefined,
       stripeRequestId:
         typeof error.requestId === "string" ? error.requestId : undefined,
@@ -79,7 +80,6 @@ export const stripeErrorContext = (error: unknown) => {
 
   return {
     errorType: error instanceof Error ? error.name : "UnknownError",
-    errorMessage: errorMessage(error),
   };
 };
 

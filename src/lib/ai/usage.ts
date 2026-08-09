@@ -3,7 +3,7 @@ import "server-only";
 import mongoose from "mongoose";
 import { env } from "@/lib/env";
 import { hasProEntitlement } from "@/lib/billing";
-import { connectToDatabase } from "@/lib/mongoose";
+import { connectToDatabase, withMongoTransaction } from "@/lib/mongoose";
 import {
   RateLimitBucketModel,
   SubscriptionModel,
@@ -112,111 +112,82 @@ export const reserveUsage = async (input: {
 }) => {
   if (!Number.isInteger(input.quantity) || input.quantity <= 0)
     throw new HttpError(400, "INVALID_USAGE_RESERVATION", "Invalid usage reservation.");
-  await connectToDatabase();
+
   const access = await getBillingAccess(input.userId);
   const period = currentPeriod(access.periodStart);
   const counterId = `${input.userId}:${period}:${input.unit}`;
-  const counter = await UsageCounterModel.findOneAndUpdate(
-    {
-      id: counterId,
-      $expr: { $lte: [{ $add: ["$used", input.quantity] }, limits[access.plan][input.unit]] },
-    },
-    { $inc: { used: input.quantity }, $setOnInsert: { id: counterId, userId: input.userId, period, unit: input.unit } },
-    { upsert: true, new: true, runValidators: true },
-  ).lean();
-  if (!counter)
-    throw new HttpError(402, "USAGE_LIMIT_EXCEEDED", `Monthly ${input.unit} allowance exceeded.`);
-  const reservation = await UsageModel.create({
-    userId: input.userId,
-    feature: input.feature,
-    quantity: input.quantity,
-    reservedQuantity: input.quantity,
-    status: "reserved",
-    unit: input.unit,
-    model: input.model,
-    resourceId: input.resourceId ?? null,
-    period,
+  const limit = limits[access.plan][input.unit];
+
+  return withMongoTransaction(async (session) => {
+    await UsageCounterModel.updateOne(
+      { id: counterId },
+      { $setOnInsert: { id: counterId, userId: input.userId, period, unit: input.unit, used: 0 } },
+      { upsert: true, session },
+    );
+    const counter = await UsageCounterModel.findOneAndUpdate(
+      { id: counterId, $expr: { $lte: [{ $add: ["$used", input.quantity] }, limit] } },
+      { $inc: { used: input.quantity } },
+      { new: true, session, runValidators: true },
+    ).lean();
+    if (!counter)
+      throw new HttpError(402, "USAGE_LIMIT_EXCEEDED", `Monthly ${input.unit} allowance exceeded.`);
+    const [reservation] = await UsageModel.create([{
+      userId: input.userId,
+      feature: input.feature,
+      quantity: input.quantity,
+      reservedQuantity: input.quantity,
+      status: "reserved",
+      unit: input.unit,
+      model: input.model,
+      resourceId: input.resourceId ?? null,
+      period,
+    }], { session });
+    return { id: reservation.id, period };
   });
-  return { id: reservation.id, period };
 };
 
-export const releaseUsage = async (reservationId: string) => {
-  await connectToDatabase();
-  const reservation = (await UsageModel.findOneAndUpdate(
-    { id: reservationId, status: "reserved" },
-    { $set: { status: "released", quantity: 0 } },
-    { new: false },
-  ).lean()) as {
-    userId: string;
-    period: string;
-    unit: UsageUnit;
-    reservedQuantity: number;
-  } | null;
-  if (!reservation) return;
-  await UsageCounterModel.updateOne(
-    { id: `${reservation.userId}:${reservation.period}:${reservation.unit}` },
-    { $inc: { used: -reservation.reservedQuantity } },
-  );
-};
-
-export const commitUsage = async (reservationId: string, actualQuantity: number) => {
-  if (!Number.isInteger(actualQuantity) || actualQuantity < 0) return;
-  await connectToDatabase();
-  const reservation = (await UsageModel.findOneAndUpdate(
-    { id: reservationId, status: "reserved" },
-    { $set: { status: "committed", quantity: actualQuantity } },
-    { new: false },
-  ).lean()) as {
-    userId: string;
-    period: string;
-    unit: UsageUnit;
-    reservedQuantity: number;
-  } | null;
-  if (!reservation) return;
-  const delta = actualQuantity - reservation.reservedQuantity;
-  if (delta)
+export const releaseUsage = async (reservationId: string) =>
+  withMongoTransaction(async (session) => {
+    const reservation = (await UsageModel.findOneAndUpdate(
+      { id: reservationId, status: "reserved" },
+      { $set: { status: "released", quantity: 0 } },
+      { new: false, session },
+    ).lean()) as { userId: string; period: string; unit: UsageUnit; reservedQuantity: number } | null;
+    if (!reservation) return;
     await UsageCounterModel.updateOne(
       { id: `${reservation.userId}:${reservation.period}:${reservation.unit}` },
-      { $inc: { used: delta } },
+      { $inc: { used: -reservation.reservedQuantity } },
+      { session },
     );
-};
-
-export const assertUsageAvailable = async (
-  userId: string,
-  unit: UsageUnit,
-  requested = 1,
-) => {
-  const summary = await usageSummary(userId);
-  if (summary.used[unit] + requested > summary.limits[unit])
-    throw new HttpError(402, "USAGE_LIMIT_EXCEEDED", `Monthly ${unit} allowance exceeded.`);
-  return summary;
-};
-
-export const recordUsage = async (input: {
-  userId: string;
-  feature: UsageFeature;
-  quantity: number;
-  unit: UsageUnit;
-  model: string;
-  resourceId?: string;
-}) => {
-  if (!Number.isFinite(input.quantity) || input.quantity < 0) return;
-  await connectToDatabase();
-  const access = await getBillingAccess(input.userId);
-  const period = currentPeriod(access.periodStart);
-  await UsageModel.create({
-    ...input,
-    quantity: input.quantity,
-    reservedQuantity: 0,
-    status: "committed",
-    period,
   });
-  const counterId = `${input.userId}:${period}:${input.unit}`;
-  await UsageCounterModel.findOneAndUpdate(
-    { id: counterId },
-    { $inc: { used: input.quantity }, $setOnInsert: { id: counterId, userId: input.userId, period, unit: input.unit } },
-    { upsert: true, runValidators: true },
-  );
+
+export const commitUsage = async (reservationId: string, actualQuantity: number) => {
+  if (!Number.isInteger(actualQuantity) || actualQuantity < 0)
+    throw new HttpError(500, "INVALID_USAGE_COMMIT", "Invalid usage commit.");
+  return withMongoTransaction(async (session) => {
+    const reservation = (await UsageModel.findOne({ id: reservationId, status: "reserved" }).session(session).lean()) as {
+      userId: string; period: string; unit: UsageUnit; reservedQuantity: number;
+    } | null;
+    if (!reservation) return;
+    if (actualQuantity > reservation.reservedQuantity)
+      throw new HttpError(409, "USAGE_RESERVATION_TOO_SMALL", "Actual usage exceeded the reservation estimate.");
+    const delta = actualQuantity - reservation.reservedQuantity;
+    if (delta !== 0) {
+      // The provider has already consumed this usage, so reconciliation must
+      // always record the exact amount. A conservative reservation estimate
+      // bounds any possible overage while negative deltas refund unused units.
+      await UsageCounterModel.updateOne(
+        { id: `${reservation.userId}:${reservation.period}:${reservation.unit}` },
+        { $inc: { used: delta } },
+        { session, runValidators: true },
+      );
+    }
+    await UsageModel.updateOne(
+      { id: reservationId, status: "reserved" },
+      { $set: { status: "committed", quantity: actualQuantity } },
+      { session },
+    );
+  });
 };
 
 export const enforceAiRateLimit = async (userId: string, action: string) => {

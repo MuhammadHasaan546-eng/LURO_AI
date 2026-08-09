@@ -1,6 +1,5 @@
 import "server-only";
 
-// @ts-ignore
 import PDFParser from "pdf2json";
 import { env } from "@/lib/env";
 import { completeText, embedTexts } from "@/lib/ai/generation";
@@ -26,17 +25,29 @@ const splitText = (text: string, size = 1_500, overlap = 200) => {
 };
 
 // Helper function to extract text using pdf2json (No worker issues)
+type PdfTextObject = { R?: Array<{ T?: string }> };
+type PdfPage = { Texts?: PdfTextObject[] };
+type PdfData = { Pages?: PdfPage[] };
+type PdfErrorData = { parserError?: string };
+
+type PdfParserInstance = {
+  on(event: "pdfParser_dataError", listener: (error: PdfErrorData) => void): void;
+  on(event: "pdfParser_dataReady", listener: (data: PdfData) => void): void;
+  parseBuffer(buffer: Buffer): void;
+};
+
+type PdfParserConstructor = new () => PdfParserInstance;
+
 const parsePdfBuffer = async (buffer: Buffer): Promise<{ text: string; pageCount: number }> => {
   return new Promise((resolve, reject) => {
-    // 🛠️ Fixed constructor line
-    // @ts-ignore
-    const pdfParser = new PDFParser();
-    
-    pdfParser.on("pdfParser_dataError", (errData: any) => {
+    const PdfParser = PDFParser as unknown as PdfParserConstructor;
+    const pdfParser = new PdfParser();
+
+    pdfParser.on("pdfParser_dataError", (errData) => {
       reject(new Error(errData.parserError || "Failed to parse PDF"));
     });
 
-    pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
+    pdfParser.on("pdfParser_dataReady", (pdfData) => {
       try {
         let extractedText = "";
         const pages = pdfData.Pages || [];
@@ -134,14 +145,15 @@ export const ingestPdf = async (userId: string, file: File) => {
 
       await commitUsage(reservation.id, pageCount);
       return document;
-    } catch (error) {
+    } catch (processingError) {
       await releaseUsage(reservation.id);
       document.status = "failed";
       document.error = "Document processing failed.";
       await document.save();
-      throw error;
+      throw processingError;
     }
-  } catch (error) {
+  } catch (parseError) {
+    if (parseError instanceof HttpError) throw parseError;
     throw new HttpError(400, "INVALID_PDF", "Could not read or parse the PDF file.");
   }
 };
