@@ -68,6 +68,7 @@ export const stripeErrorContext = (error: unknown) => {
     return {
       errorType:
         typeof error.type === "string" ? error.type : "StripeError",
+      errorMessage: errorMessage(error),
       stripeCode: typeof error.code === "string" ? error.code : undefined,
       stripeRequestId:
         typeof error.requestId === "string" ? error.requestId : undefined,

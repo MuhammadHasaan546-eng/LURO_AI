@@ -37,7 +37,6 @@ export const getCloudinary = () => {
 };
 
 export const getStripe = (): Stripe => {
-  // Check process.env fallback as well in case env object is missing it
   const secretKey = env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
 
   if (!secretKey) {
@@ -46,7 +45,7 @@ export const getStripe = (): Stripe => {
 
   if (!stripeClient) {
     stripeClient = new Stripe(secretKey, {
-      apiVersion: "2023-10-16" as any, // Explicit API Version fixes undefined methods in SDK
+      apiVersion: "2026-07-29.dahlia",
       appInfo: { name: "Luro AI" },
       maxNetworkRetries: 2,
     });

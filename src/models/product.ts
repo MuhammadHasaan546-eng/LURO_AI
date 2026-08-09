@@ -3,7 +3,7 @@ import mongoose, { Schema, type InferSchemaType, type Model } from "mongoose";
 
 const idField = {
   type: String,
-  default: randomUUID,
+  default: () => randomUUID(),
   immutable: true,
   required: true,
 } as const;
