@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { motion, useInView, useReducedMotion } from "framer-motion";
+import Image from "next/image";
 
 const footerLinks = {
   product: [
@@ -156,11 +157,16 @@ export default function Footer() {
           >
             <div className="space-y-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 to-pink-500 flex items-center justify-center font-bold text-white shadow-lg shadow-violet-950/50">
-                  S
-                </div>
+                  <Image
+                               src="/icons/icon.png"
+                               alt="Luro Logo"
+                               width={340}
+                               height={40}
+                               className="size-6 object-contain"
+                               priority
+                             />
                 <span className="text-xl font-extrabold text-white tracking-tight">
-                  SocialPulse<span className="text-violet-400">.ai</span>
+                  Luro<span className="text-violet-400">.ai</span>
                 </span>
               </div>
 

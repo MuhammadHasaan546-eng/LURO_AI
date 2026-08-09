@@ -1,9 +1,9 @@
 import "server-only";
 
 import Stripe from "stripe";
-import { env } from "@/lib/env";
-import { getStripe } from "@/lib/ai/providers";
 import { hasProEntitlementForPrice } from "@/app/constant/pricing";
+import { getStripe } from "@/lib/ai/providers";
+import { env } from "@/lib/env";
 import { connectToDatabase } from "@/lib/mongoose";
 import { SubscriptionModel } from "@/models";
 
@@ -43,32 +43,42 @@ export const billingLog = (
   event: string,
   context: Record<string, unknown> = {},
 ) => {
-  const entry = JSON.stringify({
-    scope: "billing",
-    event,
-    ...context,
-  });
+  const entry = JSON.stringify({ scope: "billing", event, ...context });
   if (level === "error") console.error(entry);
   else console.info(entry);
 };
 
-// FULLY SAFE STRIPE ERROR CONTEXT
+type StripeErrorLike = {
+  type?: unknown;
+  code?: unknown;
+  requestId?: unknown;
+  statusCode?: unknown;
+};
+
+const isStripeErrorLike = (value: unknown): value is StripeErrorLike =>
+  typeof value === "object" && value !== null;
+
+const errorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
+
 export const stripeErrorContext = (error: unknown) => {
   if (!error) return { errorType: "UnknownError" };
 
-  if (typeof error === "object" && error !== null && "type" in error && "code" in error) {
-    const err = error as any;
+  if (isStripeErrorLike(error) && ("type" in error || "code" in error)) {
     return {
-      errorType: err.type || "StripeError",
-      stripeCode: err.code,
-      stripeRequestId: err.requestId,
-      stripeStatus: err.statusCode,
+      errorType:
+        typeof error.type === "string" ? error.type : "StripeError",
+      stripeCode: typeof error.code === "string" ? error.code : undefined,
+      stripeRequestId:
+        typeof error.requestId === "string" ? error.requestId : undefined,
+      stripeStatus:
+        typeof error.statusCode === "number" ? error.statusCode : undefined,
     };
   }
 
   return {
     errorType: error instanceof Error ? error.name : "UnknownError",
-    errorMessage: error instanceof Error ? error.message : String(error),
+    errorMessage: errorMessage(error),
   };
 };
 
@@ -115,25 +125,28 @@ export const getConfiguredProPrice = async (): Promise<BillingPrice> => {
     intervalCount: price.recurring.interval_count,
   };
 };
+
+const stripeId = (value: string | { id: string } | null | undefined) =>
+  typeof value === "string" ? value : value?.id;
+
 export const getOrCreateCustomer = async (userId: string, email?: string) => {
   if (!userId) throw new Error("User ID is required to get or create customer.");
 
   await connectToDatabase();
-
-  // 1. Check existing subscription in DB
   let subscription = await SubscriptionModel.findOne({ userId });
 
-  // 2. If valid Stripe customer ID exists, verify with Stripe
   if (subscription?.stripeCustomerId) {
     try {
       const customer = await getStripe().customers.retrieve(
         subscription.stripeCustomerId,
       );
       if (!customer.deleted) return subscription;
-    } catch (error: any) {
-      if (error?.code !== "resource_missing") {
-        throw error;
-      }
+    } catch (error: unknown) {
+      const code =
+        isStripeErrorLike(error) && typeof error.code === "string"
+          ? error.code
+          : undefined;
+      if (code !== "resource_missing") throw error;
       billingLog("info", "stale_customer_replaced", {
         userId,
         stripeCustomerId: subscription.stripeCustomerId,
@@ -141,20 +154,15 @@ export const getOrCreateCustomer = async (userId: string, email?: string) => {
     }
   }
 
-  // 3. Create new customer in Stripe
   const customerPayload: Stripe.CustomerCreateParams = {
     metadata: { userId },
   };
-  if (email && typeof email === "string" && email.trim() !== "") {
-    customerPayload.email = email.trim();
-  }
+  if (email?.trim()) customerPayload.email = email.trim();
 
-  const customer = await getStripe().customers.create(
-    customerPayload,
-    { idempotencyKey: `luro-customer-${userId}` }
-  );
+  const customer = await getStripe().customers.create(customerPayload, {
+    idempotencyKey: `luro-customer-${userId}`,
+  });
 
-  // 4. Save to Database using Direct Document Operations (NO findOneAndUpdate)
   if (subscription) {
     subscription.stripeCustomerId = customer.id;
     await subscription.save();
@@ -170,40 +178,39 @@ export const getOrCreateCustomer = async (userId: string, email?: string) => {
 
   return subscription;
 };
+
 export const syncStripeCheckoutSession = async (
   checkout: Stripe.Checkout.Session,
 ) => {
-  const customerId =
-    typeof checkout.customer === "string"
-      ? checkout.customer
-      : checkout.customer?.id;
+  const customerId = stripeId(checkout.customer);
+  const subscriptionId = stripeId(checkout.subscription);
+  if (!customerId) {
+    throw new Error(`Checkout session ${checkout.id} has no customer.`);
+  }
+
   await connectToDatabase();
-  const existing = customerId
-    ? await SubscriptionModel.findOne({ stripeCustomerId: customerId }).lean()
-    : null;
+  const existing = await SubscriptionModel.findOne({
+    stripeCustomerId: customerId,
+  }).lean();
+  const existingUserId =
+    existing && !Array.isArray(existing) ? existing.userId : undefined;
   const userId =
     checkout.metadata?.userId ||
     checkout.client_reference_id ||
-    (existing && !Array.isArray(existing) ? existing.userId : undefined);
+    existingUserId;
   if (!userId) {
-    billingLog("error", "checkout_user_missing", {
-      checkoutSessionId: checkout.id,
-      stripeCustomerId: customerId,
-    });
-    return;
+    throw new Error(`No application user mapping for checkout ${checkout.id}.`);
   }
 
   await SubscriptionModel.findOneAndUpdate(
     { userId },
     {
       $set: {
-        ...(customerId ? { stripeCustomerId: customerId } : {}),
+        stripeCustomerId: customerId,
         stripeCheckoutSessionId: checkout.id,
         stripeCheckoutSessionStatus: checkout.status,
         stripeCheckoutUrl: checkout.url ?? null,
-        ...(typeof checkout.subscription === "string"
-          ? { stripeSubscriptionId: checkout.subscription }
-          : {}),
+        stripeSubscriptionId: subscriptionId ?? null,
       },
       $setOnInsert: {
         userId,
@@ -224,44 +231,46 @@ export const syncStripeCheckoutSession = async (
 export const syncStripeSubscription = async (
   subscription: Stripe.Subscription,
 ) => {
-  const customerId =
-    typeof subscription.customer === "string"
-      ? subscription.customer
-      : subscription.customer?.id;
-  await connectToDatabase();
-  const existing = customerId
-    ? await SubscriptionModel.findOne({ stripeCustomerId: customerId }).lean()
-    : null;
-  const userId =
-    subscription.metadata?.userId ||
-    (existing && !Array.isArray(existing) ? existing.userId : undefined);
-  if (!userId) {
-    billingLog("error", "subscription_user_missing", {
-      stripeSubscriptionId: subscription.id,
-      stripeCustomerId: customerId,
-    });
-    return;
+  const customerId = stripeId(subscription.customer);
+  if (!customerId) {
+    throw new Error(`Subscription ${subscription.id} has no customer.`);
   }
-  const item = subscription.items?.data?.[0];
-  const periodEnd = (subscription as any).current_period_end || item?.current_period_end;
+
+  await connectToDatabase();
+  const existing = await SubscriptionModel.findOne({
+    stripeCustomerId: customerId,
+  }).lean();
+  const existingUserId =
+    existing && !Array.isArray(existing) ? existing.userId : undefined;
+  const userId = subscription.metadata?.userId || existingUserId;
+  if (!userId) {
+    throw new Error(`No application user mapping for subscription ${subscription.id}.`);
+  }
+
+  const item = subscription.items.data[0];
+  const priceId = item ? stripeId(item.price) : undefined;
   const entitled = hasProEntitlement({
     plan: "pro",
     status: subscription.status,
-    stripePriceId: item?.price?.id,
+    stripePriceId: priceId,
   });
+
   await SubscriptionModel.findOneAndUpdate(
     { userId },
     {
       $set: {
         stripeCustomerId: customerId,
         stripeSubscriptionId: subscription.id,
-        stripePriceId: item?.price?.id ?? null,
+        stripePriceId: priceId ?? null,
         plan: entitled ? "pro" : "free",
         entitled,
         status: subscription.status,
-        currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
+        currentPeriodEnd: item?.current_period_end
+          ? new Date(item.current_period_end * 1000)
+          : null,
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
       },
+      $setOnInsert: { userId },
     },
     { upsert: true, new: true, runValidators: true },
   );

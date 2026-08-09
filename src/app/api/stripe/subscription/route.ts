@@ -1,7 +1,18 @@
 import { NextResponse } from "next/server";
 import { handleRouteError, requireAiSession } from "@/lib/ai/http";
 import { connectToDatabase } from "@/lib/mongoose";
-import { SubscriptionModel } from "@/models";
+import { SubscriptionModel, type Subscription } from "@/models";
+
+type LeanSubscription = Pick<
+  Subscription,
+  | "plan"
+  | "status"
+  | "entitled"
+  | "currentPeriodEnd"
+  | "cancelAtPeriodEnd"
+  | "stripeSubscriptionId"
+  | "stripeCustomerId"
+>;
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -11,9 +22,13 @@ export async function GET() {
     const session = await requireAiSession();
     await connectToDatabase();
 
-    const subscription = (await SubscriptionModel.findOne({
+    const subscription = await SubscriptionModel.findOne<LeanSubscription>({
       userId: session.userId,
-    }).lean()) as Record<string, any> | null;
+    })
+      .select(
+        "plan status entitled currentPeriodEnd cancelAtPeriodEnd stripeSubscriptionId stripeCustomerId",
+      )
+      .lean();
 
     const data = {
       plan: subscription?.plan ?? "free",

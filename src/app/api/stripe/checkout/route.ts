@@ -1,52 +1,45 @@
-import { randomUUID } from "node:crypto";
-import Stripe from "stripe";
+import { NextResponse } from "next/server";
 import { getStripe } from "@/lib/ai/providers";
 import { requireAiSession } from "@/lib/ai/http";
-import { getOrCreateCustomer } from "@/lib/billing";
-import { connectToDatabase } from "@/lib/mongoose";
-import { SubscriptionModel } from "@/models";
-import { NextResponse } from "next/server";
+import { getOrCreateCustomer, stripeErrorContext } from "@/lib/billing";
 
 export const runtime = "nodejs";
 
+const errorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : "CHECKOUT_FAILED";
+
 export async function POST(request: Request) {
   try {
-    // 1. Session check
     const session = await requireAiSession(request);
-    if (!session || !session.userId) {
+    if (!session.userId) {
       return NextResponse.json(
         { success: false, error: "UNAUTHORIZED" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
-    // 2. Price ID check from env
     const priceId = process.env.STRIPE_PRO_PRICE_ID;
     if (!priceId) {
       console.error("[Checkout API Error]: STRIPE_PRO_PRICE_ID missing in env");
       return NextResponse.json(
         { success: false, error: "PRICE_ID_MISSING" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    await connectToDatabase();
-
-    // 3. Get or Create Customer safely
-    const userEmail = session.user?.email;
-    const customer = await getOrCreateCustomer(session.userId, userEmail);
-
-    if (!customer || !customer.stripeCustomerId) {
+    const customer = await getOrCreateCustomer(
+      session.userId,
+      session.user?.email,
+    );
+    if (!customer.stripeCustomerId) {
       return NextResponse.json(
         { success: false, error: "CUSTOMER_NOT_FOUND" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const stripe = getStripe();
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
-    // 4. Create Stripe Checkout Session
     const checkout = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customer.stripeCustomerId,
@@ -62,12 +55,14 @@ export async function POST(request: Request) {
       success: true,
       data: { url: checkout.url },
     });
-
-  } catch (error: any) {
-    console.error("[Checkout Error Details]:", error?.message || error);
+  } catch (error: unknown) {
+    console.error("[Checkout Error Details]", {
+      message: errorMessage(error),
+      ...stripeErrorContext(error),
+    });
     return NextResponse.json(
-      { success: false, error: error?.message || "CHECKOUT_FAILED" },
-      { status: 400 }
+      { success: false, error: errorMessage(error) },
+      { status: 400 },
     );
   }
 }
