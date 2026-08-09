@@ -9,6 +9,9 @@ import { audit, createSession, hashPassword, issueAuthToken } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { sendWelcomeEmail } from "@/lib/auth-notifications";
+import { checkRateLimit } from "@/lib/rate-limit";
+
+const MAX_JSON_BODY_BYTES = 100_000;
 
 const genericDuplicateResponse = () =>
   errorResponse(
@@ -26,6 +29,19 @@ const parseBody = async (request: Request) => {
 };
 
 export async function POST(request: Request) {
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (contentLength > MAX_JSON_BODY_BYTES)
+    return errorResponse("PAYLOAD_TOO_LARGE", "Request body is too large.", 413);
+  const ipLimit = await checkRateLimit(request, "signup");
+  if (!ipLimit.allowed)
+    return errorResponse(
+      "RATE_LIMITED",
+      "Too many attempts. Please try again later.",
+      429,
+      {},
+      { "Retry-After": String(ipLimit.retryAfter) },
+    );
+
   const body = await parseBody(request);
   const validation = SignUpSchema.validate(body, {
     abortEarly: false,
@@ -48,6 +64,16 @@ export async function POST(request: Request) {
     email: string;
     password: string;
   };
+  const emailLimit = await checkRateLimit(request, "signup", email);
+  if (!emailLimit.allowed)
+    return errorResponse(
+      "RATE_LIMITED",
+      "Too many attempts. Please try again later.",
+      429,
+      {},
+      { "Retry-After": String(emailLimit.retryAfter) },
+    );
+
   const existingUser = await db.user.findUnique({
     where: { email },
     select: { id: true },

@@ -321,6 +321,27 @@ export const db = {
         (item) => withoutMongoId(item as unknown as Record<string, unknown>)!,
       );
     },
+    touch: async ({
+      id,
+      now,
+      idleExpiresAt,
+    }: {
+      id: string;
+      now: Date;
+      idleExpiresAt: Date;
+    }) => {
+      await connectToDatabase();
+      const cutoff = new Date(now.getTime() - 15 * 60_000);
+      await SessionModel.updateOne(
+        {
+          id,
+          revokedAt: null,
+          lastSeenAt: mongoose.trusted({ $lt: cutoff }),
+        },
+        { $set: { lastSeenAt: now, idleExpiresAt } },
+        { runValidators: true },
+      );
+    },
     update: async ({
       where,
       data,

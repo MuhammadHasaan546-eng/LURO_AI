@@ -2,8 +2,9 @@ import "server-only";
 
 import { env } from "@/lib/env";
 import {
-  assertUsageAvailable,
-  recordUsage,
+  commitUsage,
+  releaseUsage,
+  reserveUsage,
   type UsageFeature,
 } from "@/lib/ai/usage";
 import { HttpError } from "@/lib/ai/http";
@@ -23,8 +24,18 @@ export const completeText = async (input: {
   resourceId?: string;
   maxOutputTokens?: number;
 }): Promise<CompletionResult> => {
-  await assertUsageAvailable(input.userId, "tokens", 1);
+  const maxOutputTokens = Math.min(input.maxOutputTokens ?? 2_000, 4_000);
+  const estimatedInputTokens = Math.ceil((input.system.length + input.prompt.length) / 4);
+  const reservation = await reserveUsage({
+    userId: input.userId,
+    feature: input.feature,
+    unit: "tokens",
+    quantity: estimatedInputTokens + maxOutputTokens,
+    model: env.OPENROUTER_CHAT_MODEL,
+    resourceId: input.resourceId,
+  });
 
+  try {
   const response = await fetch(`${env.OPENROUTER_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: {
@@ -39,7 +50,7 @@ export const completeText = async (input: {
         { role: "system", content: input.system },
         { role: "user", content: input.prompt },
       ],
-      max_tokens: Math.min(input.maxOutputTokens ?? 2_000, 4_000),
+      max_tokens: maxOutputTokens,
     }),
   });
 
@@ -66,16 +77,13 @@ export const completeText = async (input: {
   const inputTokens = data.usage?.prompt_tokens ?? 0;
   const outputTokens = data.usage?.completion_tokens ?? 0;
 
-  await recordUsage({
-    userId: input.userId,
-    feature: input.feature,
-    quantity: inputTokens + outputTokens,
-    unit: "tokens",
-    model: data.model || env.OPENROUTER_CHAT_MODEL,
-    resourceId: input.resourceId,
-  });
+  await commitUsage(reservation.id, inputTokens + outputTokens);
 
   return { content, inputTokens, outputTokens, model: data.model || env.OPENROUTER_CHAT_MODEL };
+  } catch (error) {
+    await releaseUsage(reservation.id);
+    throw error;
+  }
 };
 
 export const parseJsonObject = <T>(content: string): T => {

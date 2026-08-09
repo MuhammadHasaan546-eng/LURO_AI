@@ -7,11 +7,7 @@ import {
   parseHistoryQuery,
   requireAiSession,
 } from "@/lib/ai/http";
-import {
-  assertUsageAvailable,
-  enforceAiRateLimit,
-  trustedBeforeFilter,
-} from "@/lib/ai/usage";
+import { enforceAiRateLimit, trustedBeforeFilter } from "@/lib/ai/usage";
 import { connectToDatabase } from "@/lib/mongoose";
 import { ChatModel, type Chat } from "@/models";
 import { successResponse } from "@/lib/api-response";
@@ -40,7 +36,6 @@ export async function POST(request: Request) {
   try {
     const session = await requireAiSession(request);
     await enforceAiRateLimit(session.userId, "chat");
-    await assertUsageAvailable(session.userId, "tokens", 1);
     const input = await parseBody<ChatInput>(request, chatSchema);
     await connectToDatabase();
     const chat = input.chatId

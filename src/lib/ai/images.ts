@@ -5,7 +5,7 @@ import axios, { AxiosError } from "axios";
 import { env } from "@/lib/env";
 import type { ImageInput } from "@/lib/ai/contracts";
 import { getCloudinary, getPollinationsImageUrl } from "@/lib/ai/providers";
-import { assertUsageAvailable, recordUsage } from "@/lib/ai/usage";
+import { commitUsage, releaseUsage, reserveUsage } from "@/lib/ai/usage";
 import { HttpError } from "@/lib/ai/http";
 import { connectToDatabase } from "@/lib/mongoose";
 import { ImageModel } from "@/models";
@@ -116,9 +116,16 @@ const uploadImage = async (userId: string, base64Image: string) => {
 };
 
 export const createImage = async (userId: string, input: ImageInput) => {
-  await assertUsageAvailable(userId, "images", 1);
-
   const selectedModel = env.POLLINATIONS_IMAGE_MODEL || "flux";
+  const reservation = await reserveUsage({
+    userId,
+    feature: "image",
+    unit: "images",
+    quantity: 1,
+    model: `pollinations/${selectedModel}`,
+  });
+
+  try {
   const imageUrl = getPollinationsImageUrl(
     input.prompt,
     selectedModel,
@@ -141,14 +148,10 @@ export const createImage = async (userId: string, input: ImageInput) => {
     model: `pollinations/${selectedModel}`,
   });
 
-  await recordUsage({
-    userId,
-    feature: "image",
-    quantity: 1,
-    unit: "images",
-    model: `pollinations/${selectedModel}`,
-    resourceId: image.id,
-  });
-
+  await commitUsage(reservation.id, 1);
   return image;
+  } catch (error) {
+    await releaseUsage(reservation.id);
+    throw error;
+  }
 };

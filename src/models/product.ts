@@ -209,6 +209,13 @@ const usageSchema = new Schema(
       required: true,
     },
     quantity: { type: Number, required: true, min: 0 },
+    reservedQuantity: { type: Number, required: true, min: 0 },
+    status: {
+      type: String,
+      enum: ["reserved", "committed", "released"],
+      required: true,
+      default: "committed",
+    },
     unit: { type: String, enum: ["tokens", "images", "pages"], required: true },
     model: { type: String, required: true, maxlength: 100 },
     resourceId: { type: String, default: null, maxlength: 100 },
@@ -218,6 +225,19 @@ const usageSchema = new Schema(
 );
 usageSchema.index({ id: 1 }, { unique: true });
 usageSchema.index({ userId: 1, period: 1, feature: 1, unit: 1 });
+
+const usageCounterSchema = new Schema(
+  {
+    id: { type: String, required: true, immutable: true },
+    userId: ownerField,
+    period: { type: String, required: true, match: /^\d{4}-\d{2}$/ },
+    unit: { type: String, enum: ["tokens", "images", "pages"], required: true },
+    used: { type: Number, required: true, default: 0, min: 0 },
+  },
+  schemaOptions,
+);
+usageCounterSchema.index({ id: 1 }, { unique: true });
+usageCounterSchema.index({ userId: 1, period: 1, unit: 1 }, { unique: true });
 
 const subscriptionSchema = new Schema(
   {
@@ -298,6 +318,8 @@ const stripeWebhookEventSchema = new Schema(
       default: "processing",
       required: true,
     },
+    processingLeaseUntil: { type: Date, default: null },
+    processingToken: { type: String, default: null, maxlength: 100 },
     processedAt: { type: Date, default: null },
     error: { type: String, default: null, maxlength: 1_000 },
   },
@@ -315,6 +337,7 @@ export type Document = InferSchemaType<typeof documentSchema>;
 export type DocumentChunk = InferSchemaType<typeof documentChunkSchema>;
 export type DocumentQuestion = InferSchemaType<typeof documentQuestionSchema>;
 export type Usage = InferSchemaType<typeof usageSchema>;
+export type UsageCounter = InferSchemaType<typeof usageCounterSchema>;
 export type Subscription = InferSchemaType<typeof subscriptionSchema>;
 export type StripeWebhookEvent = InferSchemaType<typeof stripeWebhookEventSchema>;
 
@@ -334,6 +357,7 @@ export const DocumentQuestionModel = model(
   documentQuestionSchema,
 );
 export const UsageModel = model("Usage", usageSchema);
+export const UsageCounterModel = model("UsageCounter", usageCounterSchema);
 export const SubscriptionModel = model("Subscription", subscriptionSchema);
 export const StripeWebhookEventModel = model(
   "StripeWebhookEvent",
@@ -349,6 +373,7 @@ export const productModels = [
   DocumentChunkModel,
   DocumentQuestionModel,
   UsageModel,
+  UsageCounterModel,
   SubscriptionModel,
   StripeWebhookEventModel,
 ];

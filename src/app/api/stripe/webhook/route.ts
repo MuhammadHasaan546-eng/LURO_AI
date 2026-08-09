@@ -38,6 +38,7 @@ const invoiceSubscriptionId = (invoice: Stripe.Invoice) => {
 
 export async function POST(request: Request) {
   const requestId = request.headers.get("x-request-id") ?? randomUUID();
+  let processingToken: string | undefined;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
     return new NextResponse("Webhook secret missing", { status: 500 });
@@ -71,19 +72,29 @@ export async function POST(request: Request) {
 
   try {
     await connectToDatabase();
+    const now = new Date();
+    const leaseUntil = new Date(now.getTime() + 5 * 60_000);
+    processingToken = randomUUID();
     const claimed = await StripeWebhookEventModel.findOneAndUpdate(
-      { id: event.id },
       {
-        $setOnInsert: {
-          id: event.id,
-          type: event.type,
-          status: "processing",
-        },
+        id: event.id,
+        $or: [
+          { status: "failed" },
+          { status: "processing", processingLeaseUntil: { $lte: now } },
+        ],
       },
-      { upsert: true, new: true, rawResult: true, runValidators: true },
+      { $set: { status: "processing", processingLeaseUntil: leaseUntil, processingToken, error: null } },
+      { new: true, runValidators: true },
     );
-    const wasInserted = Boolean(claimed.lastErrorObject?.upserted);
-    if (!wasInserted) {
+    const inserted = claimed ?? (await StripeWebhookEventModel.create({
+      id: event.id,
+      type: event.type,
+      status: "processing",
+      processingLeaseUntil: leaseUntil,
+      processingToken,
+    }));
+    const wasClaimed = inserted.processingToken === processingToken;
+    if (!wasClaimed) {
       billingLog("info", "webhook_duplicate_ignored", {
         requestId,
         eventId: event.id,
@@ -170,18 +181,27 @@ export async function POST(request: Request) {
     }
 
     await StripeWebhookEventModel.updateOne(
-      { id: event.id },
-      { $set: { status: "processed", processedAt: new Date() } },
+      { id: event.id, status: "processing", processingToken },
+      { $set: { status: "processed", processedAt: new Date(), processingLeaseUntil: null, processingToken: null } },
     );
 
     return NextResponse.json({ received: true });
   } catch (error: unknown) {
-    await StripeWebhookEventModel.deleteOne({ id: event.id }).catch(
-      (recordError: unknown) =>
-        billingLog("error", "webhook_failure_record_failed", {
-          eventId: event.id,
-          ...stripeErrorContext(recordError),
-        }),
+    await StripeWebhookEventModel.updateOne(
+      { id: event.id, status: "processing", processingToken },
+      {
+        $set: {
+          status: "failed",
+          error: messageFromError(error).slice(0, 1_000),
+          processingLeaseUntil: null,
+          processingToken: null,
+        },
+      },
+    ).catch((recordError: unknown) =>
+      billingLog("error", "webhook_failure_record_failed", {
+        eventId: event.id,
+        ...stripeErrorContext(recordError),
+      }),
     );
     billingLog("error", "webhook_processing_failed", {
       requestId,

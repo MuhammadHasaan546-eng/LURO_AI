@@ -6,7 +6,7 @@ import { env } from "@/lib/env";
 import { completeText, embedTexts } from "@/lib/ai/generation";
 import { cosineSimilarity } from "@/lib/ai/vector";
 import { HttpError } from "@/lib/ai/http";
-import { assertUsageAvailable, recordUsage } from "@/lib/ai/usage";
+import { commitUsage, releaseUsage, reserveUsage } from "@/lib/ai/usage";
 import { connectToDatabase } from "@/lib/mongoose";
 import {
   DocumentChunkModel,
@@ -81,14 +81,22 @@ export const ingestPdf = async (userId: string, file: File) => {
   try {
     const { text, pageCount } = await parsePdfBuffer(buffer);
     
-    await assertUsageAvailable(userId, "pages", pageCount);
+    const reservation = await reserveUsage({
+      userId,
+      feature: "pdf",
+      unit: "pages",
+      quantity: pageCount,
+      model: env.OPENROUTER_EMBEDDING_MODEL,
+    });
     const chunks = splitText(text);
-    if (!chunks.length)
+    if (!chunks.length) {
+      await releaseUsage(reservation.id);
       throw new HttpError(
         422,
         "PDF_TEXT_EMPTY",
         "No extractable text was found.",
       );
+    }
 
     await connectToDatabase();
     const document = await DocumentModel.create({
@@ -124,17 +132,10 @@ export const ingestPdf = async (userId: string, file: File) => {
       document.status = "ready";
       await document.save();
 
-      await recordUsage({
-        userId,
-        feature: "pdf",
-        quantity: pageCount,
-        unit: "pages",
-        model: env.OPENROUTER_EMBEDDING_MODEL,
-        resourceId: document.id,
-      });
-
+      await commitUsage(reservation.id, pageCount);
       return document;
     } catch (error) {
+      await releaseUsage(reservation.id);
       document.status = "failed";
       document.error = "Document processing failed.";
       await document.save();

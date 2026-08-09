@@ -10,9 +10,6 @@ import {
 
 export const runtime = "nodejs";
 
-const errorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : "CHECKOUT_FAILED";
-
 export async function POST(request: Request) {
   try {
     const session = await requireAiSession(request);
@@ -67,8 +64,12 @@ export async function POST(request: Request) {
       }),
     );
     return NextResponse.json(
-      { success: false, error: errorMessage(error) },
-      { status: 400 },
+      {
+        success: false,
+        code: "CHECKOUT_FAILED",
+        message: "Unable to start checkout. Please try again later.",
+      },
+      { status: 502 },
     );
   }
 }

@@ -1,52 +1,45 @@
-import { db } from "@/lib/db";
 import { hashIp } from "@/lib/auth";
+import { connectToDatabase } from "@/lib/mongoose";
+import { RateLimitBucketModel, type RateLimitBucket } from "@/models";
 
-const rules: Record<
-  string,
-  { limit: number; windowMs: number; blockMs: number }
-> = {
-  signin: { limit: 10, windowMs: 15 * 60_000, blockMs: 15 * 60_000 },
-  signup: { limit: 5, windowMs: 60 * 60_000, blockMs: 60 * 60_000 },
-  recovery: { limit: 5, windowMs: 60 * 60_000, blockMs: 60 * 60_000 },
-  oauth: { limit: 20, windowMs: 15 * 60_000, blockMs: 15 * 60_000 },
-};
+const rules = {
+  signin: { limit: 10, windowMs: 15 * 60_000 },
+  signup: { limit: 5, windowMs: 60 * 60_000 },
+  recovery: { limit: 5, windowMs: 60 * 60_000 },
+  oauth: { limit: 20, windowMs: 15 * 60_000 },
+} as const;
 
 export const checkRateLimit = async (
   request: Request,
   action: keyof typeof rules,
   discriminator = "",
 ) => {
+  await connectToDatabase();
   const rule = rules[action];
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     request.headers.get("x-real-ip") ??
     "unknown";
-  const id = `${action}:${hashIp(ip)}:${discriminator}`;
   const now = new Date();
-  const bucket = await db.rateLimitBucket.findUnique({ where: { id } });
-  if (bucket?.blockedUntil && bucket.blockedUntil > now)
-    return {
-      allowed: false,
-      retryAfter: Math.ceil(
-        (bucket.blockedUntil.getTime() - now.getTime()) / 1000,
-      ),
-    };
-  const reset =
-    !bucket || now.getTime() - bucket.windowStart.getTime() >= rule.windowMs;
-  const count = reset ? 1 : bucket.count + 1;
-  const blockedUntil =
-    count > rule.limit ? new Date(now.getTime() + rule.blockMs) : null;
-  await db.rateLimitBucket.upsert({
-    where: { id },
-    create: { id, count, windowStart: now, blockedUntil },
-    update: {
-      count,
-      windowStart: reset ? now : bucket!.windowStart,
-      blockedUntil,
+  const windowStartMs = Math.floor(now.getTime() / rule.windowMs) * rule.windowMs;
+  const windowStart = new Date(windowStartMs);
+  const windowEnd = new Date(windowStartMs + rule.windowMs);
+  const id = `${action}:${hashIp(ip)}:${discriminator}:${windowStart.toISOString()}`;
+
+  const bucket = (await RateLimitBucketModel.findOneAndUpdate(
+    { id },
+    {
+      $inc: { count: 1 },
+      $setOnInsert: { id, windowStart, blockedUntil: null },
     },
-  });
+    { upsert: true, new: true, runValidators: true },
+  ).lean()) as RateLimitBucket | null;
+
+  const allowed = Boolean(bucket && bucket.count <= rule.limit);
   return {
-    allowed: !blockedUntil,
-    retryAfter: blockedUntil ? Math.ceil(rule.blockMs / 1000) : 0,
+    allowed,
+    retryAfter: allowed
+      ? 0
+      : Math.max(1, Math.ceil((windowEnd.getTime() - now.getTime()) / 1000)),
   };
 };

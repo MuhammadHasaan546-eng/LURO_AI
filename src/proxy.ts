@@ -16,7 +16,15 @@ const isProtectedApiPath = (pathname: string) =>
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (!isProtectedApiPath(pathname)) return NextResponse.next();
+  const response = NextResponse.next();
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  if (process.env.NODE_ENV === "production")
+    response.headers.set(
+      "Strict-Transport-Security",
+      "max-age=63072000; includeSubDomains; preload",
+    );
+  if (!isProtectedApiPath(pathname)) return response;
 
   // Keep token verification consistent with lib/auth.ts in development. In
   // production, env validation requires AUTH_SECRET, so no fallback is used.
@@ -43,7 +51,7 @@ export async function proxy(request: NextRequest) {
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
     });
-    return NextResponse.next();
+    return response;
   } catch {
     return NextResponse.json(
       {
@@ -57,5 +65,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/api/account/:path*", "/api/auth/resend-verification"],
+  matcher: ["/api/:path*", "/((?!_next/static|_next/image|favicon.ico).*)"],
 };

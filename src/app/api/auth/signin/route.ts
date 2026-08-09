@@ -15,25 +15,10 @@ import {
 import { db } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rate-limit";
 
-const invalidPassword = () =>
-  errorResponse("INVALID_PASSWORD", "The password you entered is incorrect.", 401, {
-    fieldErrors: { password: ["The password you entered is incorrect."] },
-  });
+const MAX_JSON_BODY_BYTES = 100_000;
 
-const oauthOnly = () =>
-  errorResponse(
-    "OAUTH_ONLY_ACCOUNT",
-    "This account uses Google sign-in and does not have a password. Continue with Google instead.",
-    409,
-    {
-      formErrors: [
-        "This account uses Google sign-in and does not have a password. Continue with Google instead.",
-      ],
-    },
-  );
-
-const userNotFound = () =>
-  errorResponse("USER_NOT_FOUND", "User does not exist. Please sign up.", 404);
+const invalidCredentials = () =>
+  errorResponse("INVALID_CREDENTIALS", "Invalid email or password.", 401);
 
 async function signIn(request: Request) {
   const current = await getCurrentSession();
@@ -48,7 +33,19 @@ async function signIn(request: Request) {
     );
   }
 
-  const body = await request.json().catch(() => null);
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (contentLength > MAX_JSON_BODY_BYTES)
+    return errorResponse("PAYLOAD_TOO_LARGE", "Request body is too large.", 413);
+  const rawBody = await request.text().catch(() => "");
+  if (new TextEncoder().encode(rawBody).byteLength > MAX_JSON_BODY_BYTES)
+    return errorResponse("PAYLOAD_TOO_LARGE", "Request body is too large.", 413);
+  const body = (() => {
+    try {
+      return JSON.parse(rawBody);
+    } catch {
+      return null;
+    }
+  })();
   const validation = SignInSchema.validate(body, {
     abortEarly: false,
     allowUnknown: false,
@@ -89,15 +86,15 @@ async function signIn(request: Request) {
   });
   if (!user) {
     await audit("signin", "FAILURE", undefined, request).catch(() => undefined);
-    return userNotFound();
+    return invalidCredentials();
   }
   if (!user.passwordHash) {
     await audit("signin", "FAILURE", user.id, request).catch(() => undefined);
-    return oauthOnly();
+    return invalidCredentials();
   }
   if (!(await verifyPassword(password, user.passwordHash))) {
     await audit("signin", "FAILURE", user.id, request).catch(() => undefined);
-    return invalidPassword();
+    return invalidCredentials();
   }
   await db.user.update({
     where: { id: user.id },

@@ -49,8 +49,12 @@ export const parseBody = async <T>(
     throw new HttpError(413, "PAYLOAD_TOO_LARGE", "Request body is too large.");
   let body: unknown;
   try {
-    body = await request.json();
-  } catch {
+    const text = await request.text();
+    if (new TextEncoder().encode(text).byteLength > 100_000)
+      throw new HttpError(413, "PAYLOAD_TOO_LARGE", "Request body is too large.");
+    body = JSON.parse(text);
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
     throw new HttpError(
       400,
       "MALFORMED_JSON",

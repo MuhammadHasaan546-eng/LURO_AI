@@ -133,6 +133,13 @@ export const getCurrentSession = async (): Promise<CurrentSession | null> => {
         .catch(() => undefined);
     return null;
   }
+  const now = new Date();
+  if (now.getTime() - session.lastSeenAt.getTime() >= 15 * 60_000) {
+    const idleExpiresAt = new Date(now.getTime() + IDLE_TTL_MS);
+    await db.session.touch({ id: session.id, now, idleExpiresAt });
+    session.lastSeenAt = now;
+    session.idleExpiresAt = idleExpiresAt;
+  }
   return session as CurrentSession;
 };
 
