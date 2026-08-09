@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { handleRouteError, requireAiSession } from "@/lib/ai/http";
+import { getStripe } from "@/lib/ai/providers";
+import {
+  stripeErrorContext,
+  syncStripeCheckoutSession,
+  syncStripeSubscription,
+} from "@/lib/billing";
 import { usageSummary } from "@/lib/ai/usage";
 import { connectToDatabase } from "@/lib/mongoose";
 import { SubscriptionModel, type Subscription } from "@/models";
@@ -25,9 +31,37 @@ type LeanSubscription = Pick<
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await requireAiSession();
+    const sessionId = new URL(request.url).searchParams.get("session_id");
+
+    // The webhook remains the source of truth, but Stripe's API can safely
+    // reconcile a completed Checkout Session when webhook delivery is delayed.
+    if (sessionId) {
+      const stripe = getStripe();
+      const checkout = await stripe.checkout.sessions.retrieve(sessionId, {});
+      const checkoutUserId =
+        checkout.metadata?.userId ?? checkout.client_reference_id;
+      if (checkoutUserId && checkoutUserId !== session.userId) {
+        return NextResponse.json(
+          { success: false, error: "FORBIDDEN" },
+          { status: 403 },
+        );
+      }
+
+      await syncStripeCheckoutSession(checkout);
+      const subscriptionId =
+        typeof checkout.subscription === "string"
+          ? checkout.subscription
+          : checkout.subscription?.id;
+      if (subscriptionId) {
+        const stripeSubscription =
+          await stripe.subscriptions.retrieve(subscriptionId, {});
+        await syncStripeSubscription(stripeSubscription);
+      }
+    }
+
     await connectToDatabase();
 
     const [subscription, usage] = await Promise.all([
@@ -82,6 +116,13 @@ export async function GET() {
       }
     );
   } catch (error) {
+    console.error(
+      JSON.stringify({
+        scope: "billing",
+        event: "subscription_load_failed",
+        ...stripeErrorContext(error),
+      }),
+    );
     return handleRouteError(error);
   }
 }

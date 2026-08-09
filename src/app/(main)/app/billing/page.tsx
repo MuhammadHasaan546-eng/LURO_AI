@@ -76,7 +76,10 @@ export default function BillingPage() {
   const router = useRouter();
   const sessionId = searchParams.get("session_id");
 
-  const subscription = useApiData<Subscription>("/api/stripe/subscription", {
+  const subscriptionEndpoint = sessionId
+    ? `/api/stripe/subscription?session_id=${encodeURIComponent(sessionId)}`
+    : "/api/stripe/subscription";
+  const subscription = useApiData<Subscription>(subscriptionEndpoint, {
     plan: "free",
     status: "inactive",
     entitled: false,
@@ -100,7 +103,7 @@ export default function BillingPage() {
   useEffect(() => {
     if (!sessionId || pollingStartedForSession.current === sessionId) return;
     pollingStartedForSession.current = sessionId;
-    toast.info("Payment received. Waiting for secure subscription confirmation…");
+    toast.info("Payment received. Confirming your subscription with Stripe…");
     let attempts = 0;
     let stopped = false;
 
@@ -111,8 +114,8 @@ export default function BillingPage() {
         window.setTimeout(() => void poll(), 1500);
       else if (!stopped) {
         router.replace("/app/billing");
-        toast.info(
-          "Stripe confirmation is still processing. Refresh billing shortly if Pro is not yet visible.",
+        toast.error(
+          "We could not confirm Pro yet. Check the payment in Stripe or try again.",
         );
       }
     };
@@ -211,7 +214,7 @@ export default function BillingPage() {
             <Card className="border-amber-400/25 bg-amber-400/10">
               <CardContent className="flex items-center gap-3 p-4 text-sm text-amber-100">
                 <LoaderCircle className="size-4 animate-spin" />
-                Stripe is securely synchronizing your payment. Pro access is enabled only after the verified webhook arrives.
+                Confirming your completed Checkout Session directly with Stripe.
               </CardContent>
             </Card>
           )}
