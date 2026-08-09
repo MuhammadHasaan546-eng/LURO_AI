@@ -52,19 +52,48 @@ export const disconnectFromDatabase = async () => {
   if (mongoose.connection.readyState !== 0) await mongoose.disconnect();
 };
 
+const isStandaloneTransactionError = (error: unknown) => {
+  if (!error || typeof error !== "object") return false;
+
+  const candidate = error as { code?: unknown; message?: unknown };
+  const message = typeof candidate.message === "string" ? candidate.message : "";
+
+  return (
+    candidate.code === 20 ||
+    /replica set|Transaction numbers/i.test(message)
+  );
+};
+
 export const withMongoTransaction = async <T>(
-  operation: (session: mongoose.ClientSession) => Promise<T>,
+  operation: (session: mongoose.ClientSession | null) => Promise<T>,
 ): Promise<T> => {
   await connectToDatabase();
   const session = await mongoose.startSession();
+
   try {
     let result: T | undefined;
     await session.withTransaction(async () => {
       result = await operation(session);
     });
-    if (result === undefined)
+    if (result === undefined) {
       throw new Error("MongoDB transaction completed without a result.");
+    }
     return result;
+  } catch (error) {
+    if (!isStandaloneTransactionError(error)) throw error;
+
+    // A standalone MongoDB server cannot start transactions. Abort only when
+    // there is an active transaction; abortTransaction itself is not safe to
+    // call unconditionally after withTransaction fails during setup.
+    if (session.inTransaction()) {
+      try {
+        await session.abortTransaction();
+      } catch {
+        // Preserve the original standalone-server error and use the fallback.
+      }
+    }
+
+    return operation(null);
   } finally {
     await session.endSession();
   }

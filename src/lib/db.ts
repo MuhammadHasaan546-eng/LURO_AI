@@ -93,7 +93,8 @@ export const db = {
     }) => {
       await connectToDatabase();
       const { identities, ...userData } = data;
-      const create = async (session?: ClientSession) => {
+      const create = async (session: ClientSession | null = null) => {
+        const sessionOptions = session ? { session } : {};
         const [user] = await UserModel.create(
           [
             {
@@ -106,12 +107,12 @@ export const db = {
               ...userData,
             },
           ],
-          { session },
+          sessionOptions,
         );
         if (identities) {
           await ProviderIdentityModel.create(
             [{ ...identities.create, userId: user.id }],
-            { session },
+            sessionOptions,
           );
         }
         const value = user.toObject() as Record<string, unknown>;
@@ -188,29 +189,30 @@ export const db = {
     },
     delete: async ({ where }: { where: { id: string } }) =>
       withMongoTransaction(async (session) => {
+        const sessionOptions = session ? { session } : {};
         const user = await leanOne<User>(
-          UserModel.findOneAndDelete(where, { session }),
+          UserModel.findOneAndDelete(where, sessionOptions),
         );
         await Promise.all([
-          ProviderIdentityModel.deleteMany({ userId: where.id }, { session }),
-          SessionModel.deleteMany({ userId: where.id }, { session }),
-          AuthTokenModel.deleteMany({ userId: where.id }, { session }),
-          OAuthChallengeModel.deleteMany({ userId: where.id }, { session }),
-          ChatModel.deleteMany({ userId: where.id }, { session }),
-          GenerationModel.deleteMany({ userId: where.id }, { session }),
-          EmailModel.deleteMany({ userId: where.id }, { session }),
-          TranslationModel.deleteMany({ userId: where.id }, { session }),
-          ImageModel.deleteMany({ userId: where.id }, { session }),
-          DocumentModel.deleteMany({ userId: where.id }, { session }),
-          DocumentChunkModel.deleteMany({ userId: where.id }, { session }),
-          DocumentQuestionModel.deleteMany({ userId: where.id }, { session }),
-          UsageModel.deleteMany({ userId: where.id }, { session }),
-          UsageCounterModel.deleteMany({ userId: where.id }, { session }),
-          SubscriptionModel.deleteMany({ userId: where.id }, { session }),
+          ProviderIdentityModel.deleteMany({ userId: where.id }, sessionOptions),
+          SessionModel.deleteMany({ userId: where.id }, sessionOptions),
+          AuthTokenModel.deleteMany({ userId: where.id }, sessionOptions),
+          OAuthChallengeModel.deleteMany({ userId: where.id }, sessionOptions),
+          ChatModel.deleteMany({ userId: where.id }, sessionOptions),
+          GenerationModel.deleteMany({ userId: where.id }, sessionOptions),
+          EmailModel.deleteMany({ userId: where.id }, sessionOptions),
+          TranslationModel.deleteMany({ userId: where.id }, sessionOptions),
+          ImageModel.deleteMany({ userId: where.id }, sessionOptions),
+          DocumentModel.deleteMany({ userId: where.id }, sessionOptions),
+          DocumentChunkModel.deleteMany({ userId: where.id }, sessionOptions),
+          DocumentQuestionModel.deleteMany({ userId: where.id }, sessionOptions),
+          UsageModel.deleteMany({ userId: where.id }, sessionOptions),
+          UsageCounterModel.deleteMany({ userId: where.id }, sessionOptions),
+          SubscriptionModel.deleteMany({ userId: where.id }, sessionOptions),
           AuditEventModel.updateMany(
             { userId: where.id },
             { $set: { userId: null } },
-            { session },
+            sessionOptions,
           ),
         ]);
         return user;
@@ -390,11 +392,19 @@ export const db = {
       await connectToDatabase();
       const filter = { ...where };
       if (
-        where.id &&
+        where.id !== null &&
         typeof where.id === "object" &&
-        "not" in (where.id as object)
-      )
-        filter.id = { $ne: (where.id as { not: string }).not };
+        "not" in where.id
+      ) {
+        const excludedId = (where.id as { not?: unknown }).not;
+        if (typeof excludedId !== "string") {
+          throw new TypeError("Session id.not must be a string.");
+        }
+        // sanitizeFilter wraps untrusted operator objects in $eq, which makes
+        // Mongoose cast the entire object as a string. Mark this server-built
+        // operator as trusted so the schema caster receives only its value.
+        filter.id = mongoose.trusted({ $ne: excludedId });
+      }
       const result = await SessionModel.updateMany(
         filter,
         { $set: data },
