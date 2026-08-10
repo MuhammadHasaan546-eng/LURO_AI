@@ -128,15 +128,26 @@ const environmentSchema = Joi.object({
   .unknown(true)
   .custom((value, helpers) => {
     if (value.NODE_ENV === "production") {
+      const appHostname = new URL(String(value.APP_URL)).hostname;
+      const isLocalApp =
+        appHostname === "localhost" ||
+        appHostname === "127.0.0.1" ||
+        appHostname === "::1";
+      const mongoHostname = new URL(String(value.MONGODB_URI)).hostname;
+      const isLocalMongo =
+        mongoHostname === "localhost" ||
+        mongoHostname === "127.0.0.1" ||
+        mongoHostname === "::1";
+
       if (!value.AUTH_SECRET)
         return helpers.error("any.custom", {
           message: "AUTH_SECRET is required in production",
         });
-      if (!String(value.APP_URL).startsWith("https://"))
+      if (!isLocalApp && !String(value.APP_URL).startsWith("https://"))
         return helpers.error("any.custom", {
           message: "APP_URL must use HTTPS in production",
         });
-      if (String(value.MONGODB_URI).startsWith("mongodb://127.0.0.1"))
+      if (!isLocalApp && isLocalMongo)
         return helpers.error("any.custom", {
           message: "MONGODB_URI must be explicitly configured in production",
         });

@@ -3,6 +3,8 @@ import Joi from "joi";
 import { hashPassword, requireCsrf, verifyPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 const schema = Joi.object({
   currentPassword: Joi.string().max(1024).allow(""),
   password: Joi.string().min(8).max(1024).required(),
